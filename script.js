@@ -520,7 +520,7 @@ async function refresh() {
     renderDetail(detail, rainAdjustment);
     renderRainTimeline(neaForecast, region);
     els.rainUpdated.textContent = formatUpdatedLabel(neaForecast.updatedTimestamp, "NEA updated");
-    setStatus("Showing latest reported station data.");
+    setStatus("Auto-refreshes every 10 min");
   } catch (error) {
     const localHint = window.location.protocol === "file:" && !LOCAL_TOKEN
       ? " Add a local token in local-config.js for local use."
