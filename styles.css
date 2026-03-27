@@ -595,7 +595,22 @@ h3 {
   }
 
   .topbar-actions {
-    justify-content: start;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    justify-content: stretch;
+    width: 100%;
+  }
+
+  .topbar-link,
+  .status-pill {
+    max-width: none;
+    width: 100%;
+  }
+
+  .topbar-link {
+    justify-content: center;
+    text-align: center;
   }
 
   .dashboard {
