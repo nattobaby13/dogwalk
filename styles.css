@@ -243,29 +243,6 @@ h3 {
   margin-top: 12px;
 }
 
-.rain-strip {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: stretch;
-}
-
-.rain-pager {
-  margin-top: 12px;
-  width: 42px;
-  min-width: 42px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.64);
-  color: var(--muted);
-  border-radius: 16px;
-  cursor: pointer;
-  font-size: 1.1rem;
-}
-
-.rain-pager:hover {
-  color: var(--text);
-}
-
 .source-list {
   display: grid;
   gap: 8px;
@@ -274,9 +251,13 @@ h3 {
 
 .rain-timeline {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   margin-top: 12px;
+}
+
+.nea-rain-timeline {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .station-item {
@@ -369,11 +350,42 @@ h3 {
   line-height: 1.45;
 }
 
+.source-title {
+  color: var(--text);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.source-text {
+  margin-top: 4px;
+}
+
+.source-updated {
+  margin-top: 8px;
+  color: var(--soft);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.rain-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 8px;
+}
+
+.rain-icon {
+  width: 22px;
+  height: 22px;
+  color: var(--text);
+  flex: 0 0 auto;
+}
+
 .rain-block {
   border-radius: 16px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.56);
-  min-height: 76px;
+  min-height: 94px;
   padding: 10px 8px;
   display: flex;
   flex-direction: column;
@@ -396,18 +408,18 @@ h3 {
   color: var(--soft);
   text-transform: uppercase;
   letter-spacing: 0.14em;
-  font-size: 0.62rem;
+  font-size: 0.68rem;
 }
 
 .rain-label {
-  font-size: 0.82rem;
+  font-size: 0.9rem;
   font-weight: 700;
   color: var(--text);
   letter-spacing: -0.03em;
 }
 
 .rain-detail {
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   color: var(--muted);
 }
 
@@ -556,7 +568,7 @@ h3 {
   }
 
   .rain-timeline {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 
   .dog-frame {

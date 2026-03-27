@@ -40,14 +40,13 @@ const els = {
   scoreCaption: document.getElementById("scoreCaption"),
   rainSummary: document.getElementById("rainSummary"),
   rainTimeline: document.getElementById("rainTimeline"),
-  rainToggle: document.getElementById("rainToggle"),
+  aqiUpdated: document.getElementById("aqiUpdated"),
+  rainUpdated: document.getElementById("rainUpdated"),
   stationList: document.getElementById("stationList")
 };
 
 let stations = [];
 let selectedUid = localStorage.getItem(SELECTED_STATION_KEY) || null;
-let latestHourlyRain = null;
-let rainPage = 0;
 
 function setStatus(message, isError = false) {
   els.statusMessage.textContent = message;
@@ -123,13 +122,41 @@ function formatObservedTime(time) {
   return `Station reported ${label} (${formatRelativeMinutes(time.iso)})`;
 }
 
-function formatHourLabel(isoString) {
+function formatUpdatedLabel(isoString, prefix) {
+  if (!isoString) {
+    return `${prefix} unavailable`;
+  }
+
+  const observed = new Date(isoString);
+  const label = observed.toLocaleString("en-SG", {
+    timeZone: "Asia/Singapore",
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  });
+
+  return `${prefix} ${label} (${formatRelativeMinutes(isoString)})`;
+}
+
+function formatSingleTimeLabel(isoString) {
   const date = new Date(isoString);
   return date.toLocaleString("en-SG", {
     timeZone: "Asia/Singapore",
     hour: "numeric",
     hour12: true
   });
+}
+
+function getStationRegion(name = "") {
+  const lower = name.toLowerCase();
+  if (lower.includes("east")) return "east";
+  if (lower.includes("west")) return "west";
+  if (lower.includes("north")) return "north";
+  if (lower.includes("south")) return "south";
+  if (lower.includes("central")) return "central";
+  return "central";
 }
 
 function getAqiPenalty(aqi) {
@@ -244,34 +271,74 @@ function renderScore(scoreText, scoreCaption) {
   els.scoreCaption.textContent = scoreCaption;
 }
 
-function classifyRain(rainMm, probability) {
-  if (rainMm >= 2 || probability >= 80) {
+function classifyRainText(text = "") {
+  const lower = text.toLowerCase();
+  if (lower.includes("thundery") || lower.includes("showers") || lower.includes("rain")) {
     return { key: "wet", label: "Rain likely" };
   }
-  if (rainMm >= 0.2 || probability >= 40) {
-    return { key: "light", label: "Maybe rain" };
+  if (lower.includes("cloudy")) {
+    return { key: "light", label: "Watch skies" };
   }
   return { key: "dry", label: "Looks dry" };
 }
 
-function getRainAdjustment(rainNow, probabilityNow) {
-  if (rainNow >= 2 || probabilityNow >= 80) {
+function getRainIconMarkup(text = "") {
+  const lower = text.toLowerCase();
+
+  if (lower.includes("thundery")) {
+    return `
+      <svg class="rain-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="currentColor" d="M7 18h8a5 5 0 0 0 .6-10A6 6 0 0 0 4.2 9.8 4.3 4.3 0 0 0 7 18Z"/>
+        <path fill="currentColor" d="M12 12l-2 4h2l-1 4 4-6h-2l1-2Z"/>
+      </svg>
+    `;
+  }
+
+  if (lower.includes("showers") || lower.includes("rain")) {
+    return `
+      <svg class="rain-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="currentColor" d="M7 16h8a5 5 0 0 0 .6-10A6 6 0 0 0 4.2 7.8 4.3 4.3 0 0 0 7 16Z"/>
+        <path fill="currentColor" d="M9 18c0 .8-.4 1.4-1 1.9-.6-.5-1-1.1-1-1.9 0-.7.4-1.4 1-2 .6.6 1 1.3 1 2Zm4 0c0 .8-.4 1.4-1 1.9-.6-.5-1-1.1-1-1.9 0-.7.4-1.4 1-2 .6.6 1 1.3 1 2Zm4 0c0 .8-.4 1.4-1 1.9-.6-.5-1-1.1-1-1.9 0-.7.4-1.4 1-2 .6.6 1 1.3 1 2Z"/>
+      </svg>
+    `;
+  }
+
+  if (lower.includes("cloudy")) {
+    return `
+      <svg class="rain-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="currentColor" d="M7 17h9a4.5 4.5 0 0 0 .5-9A5.5 5.5 0 0 0 6 9.5 4 4 0 0 0 7 17Z"/>
+      </svg>
+    `;
+  }
+
+  return `
+    <svg class="rain-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" fill="currentColor"/>
+      <path fill="currentColor" d="M12 2h1v4h-1zM12 18h1v4h-1zM2 12h4v1H2zM18 12h4v1h-4zM5.6 4.9l.7-.7 2.8 2.8-.7.7zM15.9 15.2l.7-.7 2.8 2.8-.7.7zM4.2 18l2.8-2.8.7.7L4.9 18.7zM16.5 7l2.8-2.8.7.7-2.8 2.8z"/>
+    </svg>
+  `;
+}
+
+function getRainAdjustmentFromForecast(text = "") {
+  const lower = text.toLowerCase();
+
+  if (lower.includes("thundery") || lower.includes("showers")) {
     return {
       hardStop: true,
       reasons: [
-        `Rain forecast for the current hour is ${rainNow.toFixed(1)} mm with ${Math.round(probabilityNow)}% probability.`,
-        "Rain is heavy or highly likely right now, so the app recommends skipping the walk."
+        `Regional forecast says "${text}".`,
+        "Showers or thundery conditions are enough to skip the walk for now."
       ]
     };
   }
 
-  if (rainNow >= 0.2 || probabilityNow >= 40) {
+  if (lower.includes("rain")) {
     return {
       hardStop: false,
       capToBrief: true,
       reasons: [
-        `Rain forecast for the current hour is ${rainNow.toFixed(1)} mm with ${Math.round(probabilityNow)}% probability.`,
-        "Light rain risk is enough to cap the verdict at 'Keep it short'."
+        `Regional forecast says "${text}".`,
+        "Rain risk is enough to cap the verdict at 'Keep it short'."
       ]
     };
   }
@@ -280,63 +347,36 @@ function getRainAdjustment(rainNow, probabilityNow) {
     hardStop: false,
     capToBrief: false,
     reasons: [
-      `Rain forecast for the current hour is ${rainNow.toFixed(1)} mm with ${Math.round(probabilityNow)}% probability.`,
-      "Rain does not tighten the verdict right now."
+      `Regional forecast says "${text || "No rain expected"}".`,
+      "Regional rain forecast does not tighten the verdict right now."
     ]
   };
 }
 
-function renderRainTimeline(hourly) {
-  if (!hourly?.time?.length) {
+function renderRainTimeline(record, region) {
+  const periods = record?.periods || [];
+  if (!periods.length) {
     els.rainSummary.textContent = "Rain forecast unavailable";
     els.rainTimeline.innerHTML = "";
-    els.rainToggle.hidden = true;
     return;
   }
 
-  latestHourlyRain = hourly;
-  const now = new Date();
-  const allUpcoming = hourly.time
-    .map((time, index) => ({
-      time,
-      rain: Number(hourly.rain?.[index]),
-      probability: Number(hourly.precipitation_probability?.[index])
-    }))
-    .filter((item) => new Date(item.time) >= now);
-
-  const pageSize = 8;
-  const maxPage = Math.max(0, Math.ceil(allUpcoming.length / pageSize) - 1);
-  if (rainPage > maxPage) {
-    rainPage = 0;
-  }
-
-  const startIndex = rainPage * pageSize;
-  const upcoming = allUpcoming.slice(startIndex, startIndex + pageSize);
-
-  if (!upcoming.length) {
-    els.rainSummary.textContent = "No near-term forecast window";
-    els.rainTimeline.innerHTML = "";
-    els.rainToggle.hidden = true;
-    return;
-  }
-
-  els.rainSummary.textContent = "Next rain forecast";
-  els.rainToggle.hidden = allUpcoming.length <= pageSize;
-  els.rainToggle.textContent = rainPage >= maxPage ? "<" : ">";
-  els.rainToggle.setAttribute(
-    "aria-label",
-    rainPage >= maxPage ? "Back to first rain forecast hours" : "Show next rain forecast hours"
-  );
-  els.rainTimeline.innerHTML = upcoming.map((item) => {
-    const rain = Number.isFinite(item.rain) ? item.rain : 0;
-    const probability = Number.isFinite(item.probability) ? item.probability : 0;
-    const state = classifyRain(rain, probability);
+  const regionLabel = `${region.charAt(0).toUpperCase()}${region.slice(1)} region`;
+  els.rainSummary.textContent = regionLabel;
+  els.rainTimeline.innerHTML = periods.map((period) => {
+    const forecast = period.regions?.[region] || period.regions?.central || { text: "Forecast unavailable" };
+    const state = classifyRainText(forecast.text || "");
+    const startLabel = formatSingleTimeLabel(period.timePeriod?.start);
+    const endLabel = formatSingleTimeLabel(period.timePeriod?.end);
 
     return `
       <article class="rain-block ${state.key}">
-        <p class="rain-time">${formatHourLabel(item.time)}</p>
+        <div class="rain-header">
+          <p class="rain-time">${startLabel} to ${endLabel}</p>
+          ${getRainIconMarkup(forecast.text || "")}
+        </div>
         <p class="rain-label">${state.label}</p>
-        <p class="rain-detail">${rain.toFixed(1)} mm • ${Math.round(probability)}%</p>
+        <p class="rain-detail">${forecast.text || "Forecast unavailable"}</p>
       </article>
     `;
   }).join("");
@@ -387,6 +427,7 @@ function renderDetail(detail, rainAdjustment) {
   els.humidityValue.textContent = formatHumidity(humidity);
   els.pollutantValue.textContent = pollutant;
   renderScore(result.scoreText, result.scoreCaption);
+  els.aqiUpdated.textContent = formatUpdatedLabel(detail.time?.iso, "AQICN updated");
 }
 
 function isSingaporeStation(station) {
@@ -421,17 +462,12 @@ async function loadStationDetail(uid) {
   return payload.data;
 }
 
-async function loadRainForecast(lat, lon) {
-  const params = new URLSearchParams({
-    latitude: String(lat),
-    longitude: String(lon),
-    timezone: "Asia/Singapore",
-    hourly: "rain,precipitation_probability",
-    forecast_days: "1"
-  });
-
-  const payload = await fetchJson(`https://api.open-meteo.com/v1/forecast?${params.toString()}`);
-  return payload.hourly;
+async function loadNeaForecast() {
+  const payload = await fetchJson("https://api-open.data.gov.sg/v2/real-time/api/twenty-four-hr-forecast");
+  if (payload.code !== 0 || !payload.data?.records?.length) {
+    throw new Error("Could not load NEA regional forecast.");
+  }
+  return payload.data.records[0];
 }
 
 async function enrichStationsWithVerdicts(baseStations) {
@@ -476,19 +512,13 @@ async function refresh() {
     stations = await enrichStationsWithVerdicts(stations);
     renderStations();
     const detail = await loadStationDetail(selectedUid);
-    const [lat, lon] = detail.city?.geo || [];
-    if (Number.isFinite(lat) && Number.isFinite(lon)) {
-      const hourlyRain = await loadRainForecast(lat, lon);
-      const rainNow = Number(hourlyRain?.rain?.[0]) || 0;
-      const probabilityNow = Number(hourlyRain?.precipitation_probability?.[0]) || 0;
-      const rainAdjustment = getRainAdjustment(rainNow, probabilityNow);
-      renderDetail(detail, rainAdjustment);
-      renderRainTimeline(hourlyRain);
-    } else {
-      renderDetail(detail, null);
-      els.rainSummary.textContent = "Rain forecast unavailable";
-      els.rainTimeline.innerHTML = "";
-    }
+    const neaForecast = await loadNeaForecast();
+    const region = getStationRegion(detail.city?.name || "");
+    const currentForecast = neaForecast.periods?.[0]?.regions?.[region]?.text || neaForecast.periods?.[0]?.regions?.central?.text || "";
+    const rainAdjustment = getRainAdjustmentFromForecast(currentForecast);
+    renderDetail(detail, rainAdjustment);
+    renderRainTimeline(neaForecast, region);
+    els.rainUpdated.textContent = formatUpdatedLabel(neaForecast.updatedTimestamp, "NEA updated");
     setStatus("Showing latest reported station data.");
   } catch (error) {
     const localHint = window.location.protocol === "file:" && !LOCAL_TOKEN
@@ -503,26 +533,8 @@ document.addEventListener("click", async (event) => {
   if (button) {
     persistSelectedUid(button.dataset.uid);
     renderStations();
-    rainPage = 0;
     await refresh();
     return;
-  }
-
-  if (event.target === els.rainToggle) {
-    const pageSize = 8;
-    const now = new Date();
-    const allUpcoming = latestHourlyRain?.time
-      ?.map((time, index) => ({
-        time,
-        rain: Number(latestHourlyRain.rain?.[index]),
-        probability: Number(latestHourlyRain.precipitation_probability?.[index])
-      }))
-      .filter((item) => new Date(item.time) >= now) || [];
-    const maxPage = Math.max(0, Math.ceil(allUpcoming.length / pageSize) - 1);
-    rainPage = rainPage >= maxPage ? 0 : rainPage + 1;
-    if (latestHourlyRain) {
-      renderRainTimeline(latestHourlyRain);
-    }
   }
 });
 

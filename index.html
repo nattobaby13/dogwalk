@@ -87,13 +87,10 @@
 
         <section class="explain-card rain-card">
           <div class="section-head">
-            <p class="section-label">Rain Forecast</p>
-            <p class="subtle" id="rainSummary">Loading rain timeline...</p>
+            <p class="section-label">Regional Rain Forecast</p>
+            <p class="subtle" id="rainSummary">Loading NEA forecast...</p>
           </div>
-          <div class="rain-strip">
-            <div class="rain-timeline" id="rainTimeline"></div>
-            <button class="rain-pager" id="rainToggle" type="button" hidden aria-label="Show next rain forecast hours">&gt;</button>
-          </div>
+          <div class="rain-timeline nea-rain-timeline" id="rainTimeline"></div>
         </section>
       </article>
 
@@ -122,8 +119,16 @@
             <p class="section-label">Data source</p>
           </div>
           <div class="source-list">
-            <p class="source-item">Air quality: World Air Quality Index Project and originating agencies.</p>
-            <p class="source-item">Rain forecast: Open-Meteo.</p>
+            <div class="source-item">
+              <p class="source-title">AQI / Temperature / Humidity</p>
+              <p class="source-text">AQICN / World Air Quality Index Project and originating agencies.</p>
+              <p class="source-updated" id="aqiUpdated">Updated time unavailable</p>
+            </div>
+            <div class="source-item">
+              <p class="source-title">Rain forecast</p>
+              <p class="source-text">NEA 24-hour regional forecast via data.gov.sg.</p>
+              <p class="source-updated" id="rainUpdated">Updated time unavailable</p>
+            </div>
             <p class="source-item">This display is an unofficial convenience tool, not an official health advisory.</p>
           </div>
         </section>
