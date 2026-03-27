@@ -1,5 +1,7 @@
 const REFRESH_INTERVAL_MS = 10 * 60 * 1000;
 const SELECTED_STATION_KEY = "dog-walk-selected-station-v2";
+const RAIN_HISTORY_KEY = "dog-walk-rain-history-v1";
+const RAIN_HISTORY_WINDOW_MS = 2 * 60 * 60 * 1000;
 const LOCAL_TOKEN = window.WAQI_LOCAL_TOKEN || null;
 
 const verdictMap = {
@@ -37,6 +39,7 @@ const els = {
   humidityValue: document.getElementById("humidityValue"),
   rainNowIcon: document.getElementById("rainNowIcon"),
   rainNowValue: document.getElementById("rainNowValue"),
+  groundValue: document.getElementById("groundValue"),
   scoreValue: document.getElementById("scoreValue"),
   scoreCaption: document.getElementById("scoreCaption"),
   rainSummary: document.getElementById("rainSummary"),
@@ -202,6 +205,30 @@ function getForecastForArea(record, areaName) {
   }
 
   return record.items[0].forecasts?.find((entry) => entry.area === areaName) || null;
+}
+
+function getNearestPoint(coordinates, points, getLatLon) {
+  if (!coordinates) {
+    return null;
+  }
+
+  let nearest = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (const point of points) {
+    const { lat, lon } = getLatLon(point) || {};
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      continue;
+    }
+
+    const distance = (coordinates.lat - lat) ** 2 + (coordinates.lon - lon) ** 2;
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      nearest = point;
+    }
+  }
+
+  return nearest;
 }
 
 function getAqiPenalty(aqi) {
@@ -393,6 +420,60 @@ function getRainAdjustmentFromForecast(text = "") {
   };
 }
 
+function loadRainHistory() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RAIN_HISTORY_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRainHistory(samples) {
+  localStorage.setItem(RAIN_HISTORY_KEY, JSON.stringify(samples));
+}
+
+function recordRainSample(stationId, timestamp, value) {
+  const now = Date.now();
+  const observed = new Date(timestamp).getTime();
+  const cutoff = now - RAIN_HISTORY_WINDOW_MS;
+  const history = loadRainHistory().filter((sample) => {
+    const sampleTime = new Date(sample.timestamp).getTime();
+    return Number.isFinite(sampleTime) && sampleTime >= cutoff;
+  });
+
+  if (stationId && timestamp && Number.isFinite(value)) {
+    const alreadyExists = history.some((sample) => sample.stationId === stationId && sample.timestamp === timestamp);
+    if (!alreadyExists) {
+      history.push({ stationId, timestamp, value });
+    }
+  }
+
+  saveRainHistory(history);
+  return history;
+}
+
+function evaluateGroundWetness(stationId, currentValue, timestamp) {
+  if (!stationId || !timestamp || !Number.isFinite(currentValue)) {
+    return "Unavailable";
+  }
+
+  const history = recordRainSample(stationId, timestamp, currentValue).filter((sample) => sample.stationId === stationId);
+  const total = history.reduce((sum, sample) => sum + (Number(sample.value) || 0), 0);
+  const recentRain = history.some((sample) => Number(sample.value) > 0);
+  const strongRecentRain = history.some((sample) => Number(sample.value) >= 0.5);
+
+  if (Number(currentValue) >= 0.5 || total >= 2 || strongRecentRain) {
+    return "Likely wet";
+  }
+
+  if (Number(currentValue) > 0 || total >= 0.2 || recentRain) {
+    return "Maybe damp";
+  }
+
+  return "Likely dry";
+}
+
 function renderRainTimeline(record, areaName) {
   const item = record?.items?.[0];
   const forecast = getForecastForArea(record, areaName);
@@ -470,6 +551,7 @@ function renderDetail(detail, rainAdjustment) {
   els.humidityValue.textContent = formatHumidity(humidity);
   els.rainNowIcon.innerHTML = getRainIconMarkup(rainAdjustment?.metricLabel || "");
   els.rainNowValue.textContent = rainAdjustment?.metricLabel || "--";
+  els.groundValue.textContent = rainAdjustment?.groundLabel || "--";
   renderScore(scoreText, scoreCaption);
   els.aqiUpdated.textContent = formatUpdatedLabel(detail.time?.iso, "AQICN updated");
 }
@@ -516,6 +598,14 @@ async function loadNeaForecast() {
   return payload.data;
 }
 
+async function loadRainfallReadings() {
+  const payload = await fetchJson("https://api-open.data.gov.sg/v2/real-time/api/rainfall");
+  if (payload.code !== 0 || !payload.data?.stations?.length || !payload.data?.readings?.length) {
+    throw new Error("Could not load NEA rainfall readings.");
+  }
+  return payload.data;
+}
+
 async function enrichStationsWithVerdicts(baseStations, neaForecast) {
   const details = await Promise.all(baseStations.map(async (station) => {
     try {
@@ -551,6 +641,7 @@ async function refresh() {
 
   try {
     const neaForecast = await loadNeaForecast();
+    const rainfallData = await loadRainfallReadings();
     stations = await loadStations();
     if (!stations.length) {
       throw new Error("No Singapore stations available.");
@@ -568,9 +659,27 @@ async function refresh() {
     const nearestArea = getNearestForecastArea(coordinates, neaForecast.area_metadata) || { name: "Unknown area" };
     const currentForecast = getForecastForArea(neaForecast, nearestArea.name)?.forecast || "";
     const rainAdjustment = getRainAdjustmentFromForecast(currentForecast);
+    const nearestRainStation = getNearestPoint(
+      coordinates,
+      rainfallData.stations,
+      (station) => ({
+        lat: Number(station?.location?.latitude),
+        lon: Number(station?.location?.longitude)
+      })
+    );
+    const latestRainReading = rainfallData.readings?.[0];
+    const rainStationReading = latestRainReading?.data?.find((entry) => entry.stationId === nearestRainStation?.id);
+    const groundLabel = evaluateGroundWetness(
+      nearestRainStation?.id,
+      Number(rainStationReading?.value),
+      latestRainReading?.timestamp
+    );
+    rainAdjustment.groundLabel = groundLabel;
     renderDetail(detail, rainAdjustment);
     renderRainTimeline(neaForecast, nearestArea.name);
-    els.rainUpdated.textContent = formatUpdatedLabel(neaForecast.items?.[0]?.update_timestamp, "NEA updated");
+    const forecastUpdated = formatUpdatedLabel(neaForecast.items?.[0]?.update_timestamp, "Forecast");
+    const rainfallUpdated = formatUpdatedLabel(latestRainReading?.timestamp, "Rainfall");
+    els.rainUpdated.textContent = `${forecastUpdated} | ${rainfallUpdated}`;
     setStatus("Auto-refreshes every 10 min");
   } catch (error) {
     const localHint = window.location.protocol === "file:" && !LOCAL_TOKEN
