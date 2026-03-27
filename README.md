@@ -19,6 +19,3 @@ For Vercel:
 - WAQI for AQI, temperature, humidity, pollutant, and station timestamp
 - Open-Meteo for rain forecast
 
-## Security note
-
-Do not put the WAQI token back into `script.js`. Keep it in the server environment only.
