@@ -243,6 +243,29 @@ h3 {
   margin-top: 12px;
 }
 
+.rain-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.rain-pager {
+  margin-top: 12px;
+  width: 42px;
+  min-width: 42px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.64);
+  color: var(--muted);
+  border-radius: 16px;
+  cursor: pointer;
+  font-size: 1.1rem;
+}
+
+.rain-pager:hover {
+  color: var(--text);
+}
+
 .source-list {
   display: grid;
   gap: 8px;

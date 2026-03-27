@@ -40,11 +40,14 @@ const els = {
   scoreCaption: document.getElementById("scoreCaption"),
   rainSummary: document.getElementById("rainSummary"),
   rainTimeline: document.getElementById("rainTimeline"),
+  rainToggle: document.getElementById("rainToggle"),
   stationList: document.getElementById("stationList")
 };
 
 let stations = [];
 let selectedUid = localStorage.getItem(SELECTED_STATION_KEY) || null;
+let latestHourlyRain = null;
+let rainPage = 0;
 
 function setStatus(message, isError = false) {
   els.statusMessage.textContent = message;
@@ -287,26 +290,43 @@ function renderRainTimeline(hourly) {
   if (!hourly?.time?.length) {
     els.rainSummary.textContent = "Rain forecast unavailable";
     els.rainTimeline.innerHTML = "";
+    els.rainToggle.hidden = true;
     return;
   }
 
+  latestHourlyRain = hourly;
   const now = new Date();
-  const upcoming = hourly.time
+  const allUpcoming = hourly.time
     .map((time, index) => ({
       time,
       rain: Number(hourly.rain?.[index]),
       probability: Number(hourly.precipitation_probability?.[index])
     }))
-    .filter((item) => new Date(item.time) >= now)
-    .slice(0, 8);
+    .filter((item) => new Date(item.time) >= now);
+
+  const pageSize = 8;
+  const maxPage = Math.max(0, Math.ceil(allUpcoming.length / pageSize) - 1);
+  if (rainPage > maxPage) {
+    rainPage = 0;
+  }
+
+  const startIndex = rainPage * pageSize;
+  const upcoming = allUpcoming.slice(startIndex, startIndex + pageSize);
 
   if (!upcoming.length) {
     els.rainSummary.textContent = "No near-term forecast window";
     els.rainTimeline.innerHTML = "";
+    els.rainToggle.hidden = true;
     return;
   }
 
-  els.rainSummary.textContent = "Next 8 forecast hours";
+  els.rainSummary.textContent = "Next rain forecast";
+  els.rainToggle.hidden = allUpcoming.length <= pageSize;
+  els.rainToggle.textContent = rainPage >= maxPage ? "<" : ">";
+  els.rainToggle.setAttribute(
+    "aria-label",
+    rainPage >= maxPage ? "Back to first rain forecast hours" : "Show next rain forecast hours"
+  );
   els.rainTimeline.innerHTML = upcoming.map((item) => {
     const rain = Number.isFinite(item.rain) ? item.rain : 0;
     const probability = Number.isFinite(item.probability) ? item.probability : 0;
@@ -480,13 +500,30 @@ async function refresh() {
 
 document.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-uid]");
-  if (!button) {
+  if (button) {
+    persistSelectedUid(button.dataset.uid);
+    renderStations();
+    rainPage = 0;
+    await refresh();
     return;
   }
 
-  persistSelectedUid(button.dataset.uid);
-  renderStations();
-  await refresh();
+  if (event.target === els.rainToggle) {
+    const pageSize = 8;
+    const now = new Date();
+    const allUpcoming = latestHourlyRain?.time
+      ?.map((time, index) => ({
+        time,
+        rain: Number(latestHourlyRain.rain?.[index]),
+        probability: Number(latestHourlyRain.precipitation_probability?.[index])
+      }))
+      .filter((item) => new Date(item.time) >= now) || [];
+    const maxPage = Math.max(0, Math.ceil(allUpcoming.length / pageSize) - 1);
+    rainPage = rainPage >= maxPage ? 0 : rainPage + 1;
+    if (latestHourlyRain) {
+      renderRainTimeline(latestHourlyRain);
+    }
+  }
 });
 
 refresh();
