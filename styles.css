@@ -230,6 +230,17 @@ h3 {
   letter-spacing: -0.03em;
 }
 
+.metric-weather {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.metric-weather strong {
+  margin-top: 0;
+}
+
 .explain-card,
 .side-card {
   margin-top: 12px;
@@ -309,18 +320,11 @@ h3 {
   text-align: left;
 }
 
-.score-legend {
-  padding: 12px 14px;
-  border-radius: 18px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.48);
-}
-
-.score-legend-title {
-  color: var(--soft);
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: 0.68rem;
+.score-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1.1fr);
+  gap: 12px;
+  margin-top: 12px;
 }
 
 .score-legend-item {
@@ -336,7 +340,8 @@ h3 {
   margin-right: 6px;
 }
 
-.side-legend {
+.legend-card {
+  text-align: left;
   margin-top: 12px;
 }
 
@@ -565,6 +570,10 @@ h3 {
 
   .score-card {
     text-align: left;
+  }
+
+  .score-row {
+    grid-template-columns: 1fr;
   }
 
   .rain-timeline {

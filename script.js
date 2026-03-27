@@ -35,7 +35,8 @@ const els = {
   aqiValue: document.getElementById("aqiValue"),
   tempValue: document.getElementById("tempValue"),
   humidityValue: document.getElementById("humidityValue"),
-  pollutantValue: document.getElementById("pollutantValue"),
+  rainNowIcon: document.getElementById("rainNowIcon"),
+  rainNowValue: document.getElementById("rainNowValue"),
   scoreValue: document.getElementById("scoreValue"),
   scoreCaption: document.getElementById("scoreCaption"),
   rainSummary: document.getElementById("rainSummary"),
@@ -325,6 +326,9 @@ function getRainAdjustmentFromForecast(text = "") {
   if (lower.includes("thundery") || lower.includes("showers") || lower.includes("rain")) {
     return {
       hardStop: true,
+      scoreText: "Hard stop",
+      scoreCaption: "Rain forecast triggered",
+      metricLabel: "Rain / showers",
       reasons: [
         `Regional forecast says "${text}".`,
         "Rain conditions are enough to skip the walk for now."
@@ -335,6 +339,9 @@ function getRainAdjustmentFromForecast(text = "") {
   return {
     hardStop: false,
     capToBrief: false,
+    scoreText: "No rain stop",
+    scoreCaption: "Rain forecast clear",
+    metricLabel: text || "No rain expected",
     reasons: [
       `Regional forecast says "${text || "No rain expected"}".`,
       "Regional rain forecast does not tighten the verdict right now."
@@ -378,7 +385,6 @@ function renderStations() {
     return `
       <button class="station-item${active ? " is-active" : ""}" type="button" data-uid="${station.uid}" data-list-state="${listVerdict.key}">
         <span class="station-name">${station.name}</span>
-        <span class="station-detail">AQI ${station.aqi}</span>
         <span class="station-state">${listVerdict.title}</span>
       </button>
     `;
@@ -389,19 +395,24 @@ function renderDetail(detail, rainAdjustment) {
   const aqi = Number(detail.aqi);
   const temp = Number(detail.iaqi?.t?.v);
   const humidity = Number(detail.iaqi?.h?.v);
-  const pollutant = formatPollutant(detail.dominentpol || "--");
   let result = getVerdictDetails(aqi, temp, humidity);
   let verdict = result.verdict;
   const reasons = [...result.reasons];
+  let scoreText = result.scoreText;
+  let scoreCaption = result.scoreCaption;
 
   if (rainAdjustment?.hardStop) {
     verdict = verdictMap.skip;
     reasons.push(...rainAdjustment.reasons);
+    scoreText = rainAdjustment.scoreText || "Hard stop";
+    scoreCaption = `${result.scoreCaption} + rain`;
   } else if (rainAdjustment?.capToBrief && verdict.key === "walk") {
     verdict = verdictMap.brief;
     reasons.push(...rainAdjustment.reasons);
+    scoreCaption = `${result.scoreCaption} + rain cap`;
   } else if (rainAdjustment?.reasons?.length) {
     reasons.push(...rainAdjustment.reasons);
+    scoreCaption = `${result.scoreCaption} + no rain stop`;
   }
 
   els.heroCard.dataset.state = verdict.key;
@@ -414,8 +425,9 @@ function renderDetail(detail, rainAdjustment) {
   els.aqiValue.textContent = Number.isFinite(aqi) ? String(aqi) : "--";
   els.tempValue.textContent = formatTemperature(temp);
   els.humidityValue.textContent = formatHumidity(humidity);
-  els.pollutantValue.textContent = pollutant;
-  renderScore(result.scoreText, result.scoreCaption);
+  els.rainNowIcon.innerHTML = getRainIconMarkup(rainAdjustment?.metricLabel || "");
+  els.rainNowValue.textContent = rainAdjustment?.metricLabel || "--";
+  renderScore(scoreText, scoreCaption);
   els.aqiUpdated.textContent = formatUpdatedLabel(detail.time?.iso, "AQICN updated");
 }
 

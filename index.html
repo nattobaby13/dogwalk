@@ -57,7 +57,7 @@
 
         <section class="metrics-grid">
           <article class="metric-card">
-            <p class="metric-label">AQI</p>
+            <p class="metric-label">AQI (PM2.5)</p>
             <strong id="aqiValue">--</strong>
           </article>
           <article class="metric-card">
@@ -69,8 +69,11 @@
             <strong id="humidityValue">--</strong>
           </article>
           <article class="metric-card">
-            <p class="metric-label">Dominant pollutant</p>
-            <strong id="pollutantValue">--</strong>
+            <p class="metric-label">Weather</p>
+            <div class="metric-weather">
+              <span id="rainNowIcon" aria-hidden="true"></span>
+              <strong id="rainNowValue">--</strong>
+            </div>
           </article>
         </section>
 
@@ -78,11 +81,20 @@
           <div class="section-head">
             <p class="section-label">Score</p>
           </div>
-          <aside class="score-card solo-score-card">
-            <p class="score-label">Walk decision score</p>
-            <strong class="score-value" id="scoreValue">--</strong>
-            <p class="score-caption" id="scoreCaption">Loading score breakdown</p>
-          </aside>
+          <div class="score-row">
+            <aside class="score-card solo-score-card">
+              <p class="score-label">Walk decision score</p>
+              <strong class="score-value" id="scoreValue">--</strong>
+              <p class="score-caption" id="scoreCaption">Loading score breakdown</p>
+            </aside>
+            <aside class="score-card legend-card">
+              <p class="score-label">Legend</p>
+              <p class="score-legend-item"><strong>0-1</strong> Walk is good</p>
+              <p class="score-legend-item"><strong>2-3</strong> Keep it short</p>
+              <p class="score-legend-item"><strong>4+</strong> Better to skip</p>
+              <p class="score-legend-item"><strong>Hard stop</strong> AQI, heat, humidity, or rain crossed a safety threshold</p>
+            </aside>
+          </div>
         </section>
 
         <section class="explain-card rain-card">
@@ -100,18 +112,6 @@
             <p class="section-label">Stations</p>
           </div>
           <div class="station-list" id="stationList"></div>
-        </section>
-
-        <section class="side-card">
-          <div class="section-head">
-            <p class="section-label">Score legend</p>
-          </div>
-          <div class="score-legend side-legend">
-            <p class="score-legend-item"><strong>0-1</strong> Walk is good</p>
-            <p class="score-legend-item"><strong>2-3</strong> Keep it short</p>
-            <p class="score-legend-item"><strong>4+</strong> Better to skip</p>
-            <p class="score-legend-item"><strong>Hard stop</strong> AQI, heat, humidity, or rain crossed a safety threshold</p>
-          </div>
         </section>
 
         <section class="side-card">
