@@ -44,6 +44,8 @@ const els = {
   scoreCaption: document.getElementById("scoreCaption"),
   rainSummary: document.getElementById("rainSummary"),
   rainTimeline: document.getElementById("rainTimeline"),
+  dayForecastSummary: document.getElementById("dayForecastSummary"),
+  dayForecastTimeline: document.getElementById("dayForecastTimeline"),
   aqiUpdated: document.getElementById("aqiUpdated"),
   rainUpdated: document.getElementById("rainUpdated"),
   stationList: document.getElementById("stationList")
@@ -229,6 +231,18 @@ function getNearestPoint(coordinates, points, getLatLon) {
   }
 
   return nearest;
+}
+
+function getRegionForCoordinates(coordinates) {
+  if (!coordinates) {
+    return "central";
+  }
+
+  if (coordinates.lon >= 103.9) return "east";
+  if (coordinates.lon <= 103.74) return "west";
+  if (coordinates.lat >= 1.39) return "north";
+  if (coordinates.lat <= 1.27) return "south";
+  return "central";
 }
 
 function getAqiPenalty(aqi) {
@@ -502,6 +516,35 @@ function renderRainTimeline(record, areaName) {
   `;
 }
 
+function renderDayForecast(record, region) {
+  const periods = record?.periods || [];
+  if (!periods.length) {
+    els.dayForecastSummary.textContent = "Day forecast unavailable";
+    els.dayForecastTimeline.innerHTML = "";
+    return;
+  }
+
+  const regionLabel = `${region.charAt(0).toUpperCase()}${region.slice(1)} region`;
+  els.dayForecastSummary.textContent = regionLabel;
+  els.dayForecastTimeline.innerHTML = periods.map((period) => {
+    const forecast = period.regions?.[region] || period.regions?.central || { text: "Forecast unavailable" };
+    const state = classifyRainText(forecast.text || "");
+    const startLabel = formatSingleTimeLabel(period.timePeriod?.start);
+    const endLabel = formatSingleTimeLabel(period.timePeriod?.end);
+
+    return `
+      <article class="rain-block ${state.key}">
+        <div class="rain-header">
+          <p class="rain-time">${startLabel} to ${endLabel}</p>
+          ${getRainIconMarkup(forecast.text || "")}
+        </div>
+        <p class="rain-label">${state.label}</p>
+        <p class="rain-detail">${forecast.text || "Forecast unavailable"}</p>
+      </article>
+    `;
+  }).join("");
+}
+
 function renderStations() {
   els.stationList.innerHTML = stations.map((station) => {
     const active = Number(station.uid) === Number(selectedUid);
@@ -598,6 +641,14 @@ async function loadNeaForecast() {
   return payload.data;
 }
 
+async function loadNeaDayForecast() {
+  const payload = await fetchJson("https://api-open.data.gov.sg/v2/real-time/api/twenty-four-hr-forecast");
+  if (payload.code !== 0 || !payload.data?.records?.length) {
+    throw new Error("Could not load NEA 24-hour forecast.");
+  }
+  return payload.data.records[0];
+}
+
 async function loadRainfallReadings() {
   const payload = await fetchJson("https://api-open.data.gov.sg/v2/real-time/api/rainfall");
   if (payload.code !== 0 || !payload.data?.stations?.length || !payload.data?.readings?.length) {
@@ -641,6 +692,7 @@ async function refresh() {
 
   try {
     const neaForecast = await loadNeaForecast();
+    const neaDayForecast = await loadNeaDayForecast();
     const rainfallData = await loadRainfallReadings();
     stations = await loadStations();
     if (!stations.length) {
@@ -657,6 +709,7 @@ async function refresh() {
     const detail = await loadStationDetail(selectedUid);
     const coordinates = getCoordinatesFromDetail(detail);
     const nearestArea = getNearestForecastArea(coordinates, neaForecast.area_metadata) || { name: "Unknown area" };
+    const dayForecastRegion = getRegionForCoordinates(coordinates);
     const currentForecast = getForecastForArea(neaForecast, nearestArea.name)?.forecast || "";
     const rainAdjustment = getRainAdjustmentFromForecast(currentForecast);
     const nearestRainStation = getNearestPoint(
@@ -677,9 +730,11 @@ async function refresh() {
     rainAdjustment.groundLabel = groundLabel;
     renderDetail(detail, rainAdjustment);
     renderRainTimeline(neaForecast, nearestArea.name);
+    renderDayForecast(neaDayForecast, dayForecastRegion);
     const forecastUpdated = formatUpdatedLabel(neaForecast.items?.[0]?.update_timestamp, "Forecast");
     const rainfallUpdated = formatUpdatedLabel(latestRainReading?.timestamp, "Rainfall");
-    els.rainUpdated.textContent = `${forecastUpdated} | ${rainfallUpdated}`;
+    const dayForecastUpdated = formatUpdatedLabel(neaDayForecast.updatedTimestamp, "24h");
+    els.rainUpdated.textContent = `${forecastUpdated} | ${dayForecastUpdated} | ${rainfallUpdated}`;
     setStatus("Auto-refreshes every 10 min");
   } catch (error) {
     const localHint = window.location.protocol === "file:" && !LOCAL_TOKEN

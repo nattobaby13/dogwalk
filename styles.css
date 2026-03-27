@@ -318,6 +318,10 @@ h3 {
   grid-template-columns: 1fr;
 }
 
+#dayForecastTimeline {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .station-item {
   border-radius: 16px;
   border: 1px solid var(--line);
