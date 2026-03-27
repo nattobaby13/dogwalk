@@ -55,6 +55,10 @@ const els = {
 let stations = [];
 let selectedUid = localStorage.getItem(SELECTED_STATION_KEY) || null;
 
+function getSelectedStation() {
+  return stations.find((station) => Number(station.uid) === Number(selectedUid)) || null;
+}
+
 function setStatus(message, isError = false) {
   els.statusMessage.textContent = message;
   els.statusMessage.style.color = isError ? "var(--skip)" : "";
@@ -693,55 +697,78 @@ async function enrichStationsWithVerdicts(baseStations, neaForecast) {
   return details;
 }
 
-async function refresh() {
+async function renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallData) {
+  const detail = await loadStationDetail(selectedUid);
+  const fallbackCoordinates = getCoordinatesFromStation(getSelectedStation());
+  const coordinates = getCoordinatesFromDetail(detail) || fallbackCoordinates;
+  const nearestArea = getNearestForecastArea(coordinates, neaForecast.area_metadata) || { name: "Unknown area" };
+  const dayForecastRegion = getRegionForCoordinates(coordinates);
+  const currentForecast = getForecastForArea(neaForecast, nearestArea.name)?.forecast || "";
+  const rainAdjustment = getRainAdjustmentFromForecast(currentForecast);
+  const nearestRainStation = getNearestPoint(
+    coordinates,
+    rainfallData.stations,
+    (station) => ({
+      lat: Number(station?.location?.latitude),
+      lon: Number(station?.location?.longitude)
+    })
+  );
+  const latestRainReading = rainfallData.readings?.[0];
+  const rainStationReading = latestRainReading?.data?.find((entry) => entry.stationId === nearestRainStation?.id);
+  const groundLabel = evaluateGroundWetness(
+    nearestRainStation?.id,
+    Number(rainStationReading?.value),
+    latestRainReading?.timestamp
+  );
+  rainAdjustment.groundLabel = groundLabel;
+  renderDetail(detail, rainAdjustment);
+  renderRainTimeline(neaForecast, nearestArea.name);
+  renderDayForecast(neaDayForecast, dayForecastRegion);
+  const forecastUpdated = formatUpdatedLabel(neaForecast.items?.[0]?.update_timestamp, "Forecast");
+  const rainfallUpdated = formatUpdatedLabel(latestRainReading?.timestamp, "Rainfall");
+  const dayForecastUpdated = formatUpdatedLabel(neaDayForecast.updatedTimestamp, "24h");
+  els.rainUpdated.textContent = `${forecastUpdated} | ${dayForecastUpdated} | ${rainfallUpdated}`;
+}
+
+async function refreshAll() {
   setStatus("Loading latest reported station data...");
 
+  const neaForecast = await loadNeaForecast();
+  const neaDayForecast = await loadNeaDayForecast();
+  const rainfallData = await loadRainfallReadings();
+  stations = await loadStations();
+  if (!stations.length) {
+    throw new Error("No Singapore stations available.");
+  }
+
+  const selectedExists = stations.some((station) => Number(station.uid) === Number(selectedUid));
+  if (!selectedExists) {
+    persistSelectedUid(stations[0].uid);
+  }
+
+  stations = await enrichStationsWithVerdicts(stations, neaForecast);
+  renderStations();
+  await renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallData);
+  setStatus("Auto-refreshes every 10 min");
+}
+
+async function refreshSelectedStation() {
+  if (!selectedUid) {
+    return refreshAll();
+  }
+
+  setStatus("Updating station...");
+  const neaForecast = await loadNeaForecast();
+  const neaDayForecast = await loadNeaDayForecast();
+  const rainfallData = await loadRainfallReadings();
+  renderStations();
+  await renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallData);
+  setStatus("Auto-refreshes every 10 min");
+}
+
+async function refresh() {
   try {
-    const neaForecast = await loadNeaForecast();
-    const neaDayForecast = await loadNeaDayForecast();
-    const rainfallData = await loadRainfallReadings();
-    stations = await loadStations();
-    if (!stations.length) {
-      throw new Error("No Singapore stations available.");
-    }
-
-    const selectedExists = stations.some((station) => Number(station.uid) === Number(selectedUid));
-    if (!selectedExists) {
-      persistSelectedUid(stations[0].uid);
-    }
-
-    stations = await enrichStationsWithVerdicts(stations, neaForecast);
-    renderStations();
-    const detail = await loadStationDetail(selectedUid);
-    const coordinates = getCoordinatesFromDetail(detail);
-    const nearestArea = getNearestForecastArea(coordinates, neaForecast.area_metadata) || { name: "Unknown area" };
-    const dayForecastRegion = getRegionForCoordinates(coordinates);
-    const currentForecast = getForecastForArea(neaForecast, nearestArea.name)?.forecast || "";
-    const rainAdjustment = getRainAdjustmentFromForecast(currentForecast);
-    const nearestRainStation = getNearestPoint(
-      coordinates,
-      rainfallData.stations,
-      (station) => ({
-        lat: Number(station?.location?.latitude),
-        lon: Number(station?.location?.longitude)
-      })
-    );
-    const latestRainReading = rainfallData.readings?.[0];
-    const rainStationReading = latestRainReading?.data?.find((entry) => entry.stationId === nearestRainStation?.id);
-    const groundLabel = evaluateGroundWetness(
-      nearestRainStation?.id,
-      Number(rainStationReading?.value),
-      latestRainReading?.timestamp
-    );
-    rainAdjustment.groundLabel = groundLabel;
-    renderDetail(detail, rainAdjustment);
-    renderRainTimeline(neaForecast, nearestArea.name);
-    renderDayForecast(neaDayForecast, dayForecastRegion);
-    const forecastUpdated = formatUpdatedLabel(neaForecast.items?.[0]?.update_timestamp, "Forecast");
-    const rainfallUpdated = formatUpdatedLabel(latestRainReading?.timestamp, "Rainfall");
-    const dayForecastUpdated = formatUpdatedLabel(neaDayForecast.updatedTimestamp, "24h");
-    els.rainUpdated.textContent = `${forecastUpdated} | ${dayForecastUpdated} | ${rainfallUpdated}`;
-    setStatus("Auto-refreshes every 10 min");
+    await refreshAll();
   } catch (error) {
     const localHint = window.location.protocol === "file:" && !LOCAL_TOKEN
       ? " Add a local token in local-config.js for local use."
@@ -754,16 +781,22 @@ document.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-uid]");
   if (button) {
     persistSelectedUid(button.dataset.uid);
-    renderStations();
-    await refresh();
+    try {
+      await refreshSelectedStation();
+    } catch (error) {
+      setStatus(error.message || "Unable to update station.", true);
+    }
     return;
   }
 });
 
 els.stationSelect.addEventListener("change", async (event) => {
   persistSelectedUid(event.target.value);
-  renderStations();
-  await refresh();
+  try {
+    await refreshSelectedStation();
+  } catch (error) {
+    setStatus(error.message || "Unable to update station.", true);
+  }
 });
 
 refresh();
