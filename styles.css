@@ -647,7 +647,28 @@ h3 {
   }
 
   .dashboard {
-    display: grid;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .side-column {
+    display: contents;
+  }
+
+  .side-column > :nth-child(1) {
+    order: 1;
+  }
+
+  .hero-card {
+    order: 2;
+  }
+
+  .side-column > :nth-child(2) {
+    order: 3;
+  }
+
+  .side-column > :nth-child(3) {
+    order: 4;
   }
 
   .station-list {
