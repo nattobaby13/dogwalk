@@ -48,6 +48,7 @@ const els = {
   dayForecastTimeline: document.getElementById("dayForecastTimeline"),
   aqiUpdated: document.getElementById("aqiUpdated"),
   rainUpdated: document.getElementById("rainUpdated"),
+  stationSelect: document.getElementById("stationSelect"),
   stationList: document.getElementById("stationList")
 };
 
@@ -546,6 +547,11 @@ function renderDayForecast(record, region) {
 }
 
 function renderStations() {
+  els.stationSelect.innerHTML = stations.map((station) => {
+    const selected = Number(station.uid) === Number(selectedUid) ? " selected" : "";
+    return `<option value="${station.uid}"${selected}>${station.name}</option>`;
+  }).join("");
+
   els.stationList.innerHTML = stations.map((station) => {
     const active = Number(station.uid) === Number(selectedUid);
     const listVerdict = station.verdict || verdictMap.brief;
@@ -752,6 +758,12 @@ document.addEventListener("click", async (event) => {
     await refresh();
     return;
   }
+});
+
+els.stationSelect.addEventListener("change", async (event) => {
+  persistSelectedUid(event.target.value);
+  renderStations();
+  await refresh();
 });
 
 refresh();
