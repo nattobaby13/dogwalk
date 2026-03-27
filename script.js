@@ -208,7 +208,7 @@ function getVerdictDetails(aqi, temp, humidity) {
     verdict = verdictMap.brief;
   }
 
-  if (Number.isFinite(aqi) && aqi > 80 && verdict.key === "walk") {
+  if (Number.isFinite(aqi) && aqi >= 101 && verdict.key === "walk") {
     verdict = verdictMap.brief;
   }
 
@@ -224,8 +224,8 @@ function getVerdictDetails(aqi, temp, humidity) {
       : "Humidity unavailable."
   ];
 
-  if (Number.isFinite(aqi) && aqi > 80) {
-    reasons.push("AQI above 80 caps the result at 'Keep it short'.");
+  if (Number.isFinite(aqi) && aqi >= 101) {
+    reasons.push("AQI above 100 is not allowed to return 'Walk is good'.");
   }
 
   return {
