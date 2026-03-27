@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Singapore Dog Walk Display</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="screen">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Singapore Dog Walk Display</p>
+        <h1>Should we walk now?</h1>
+      </div>
+      <div class="status-pill" id="statusMessage">Loading latest reported station data...</div>
+    </header>
+
+    <section class="dashboard">
+      <article class="hero-card" id="heroCard" data-state="walk">
+        <header class="hero-head">
+          <div>
+            <p class="eyebrow">Selected station</p>
+            <h2 id="stationName">Loading station...</h2>
+            <p class="subtle" id="stationMeta">Singapore</p>
+          </div>
+          <p class="timestamp" id="updatedAt">Waiting for data</p>
+        </header>
+
+        <section class="decision-row">
+          <div class="dog-frame">
+            <svg class="dog-icon" viewBox="0 0 220 220" aria-hidden="true">
+              <path class="dog-ear" d="M67 53c-16 4-28 14-35 30-3 8-3 17 0 25 11-5 19-12 26-22 7-10 10-21 9-33Z"/>
+              <path class="dog-ear" d="M153 53c-1 12 2 23 9 33 7 10 15 17 26 22 3-8 3-17 0-25-7-16-19-26-35-30Z"/>
+              <path class="dog-head" d="M110 48c34 0 61 29 61 66 0 40-27 71-61 71s-61-31-61-71c0-37 27-66 61-66Z"/>
+              <ellipse class="dog-snout" cx="110" cy="133" rx="28" ry="22"/>
+              <circle class="dog-eye" cx="87" cy="107" r="6"/>
+              <circle class="dog-eye" cx="133" cy="107" r="6"/>
+              <circle class="dog-nose" cx="110" cy="124" r="7"/>
+              <path class="dog-mouth happy-mouth" d="M95 138c4 9 10 13 15 13s11-4 15-13"/>
+              <path class="dog-mouth neutral-mouth" d="M97 144h26"/>
+              <path class="dog-mouth sad-mouth" d="M96 152c4-8 9-12 14-12s10 4 14 12"/>
+            </svg>
+          </div>
+
+          <div class="decision-copy">
+            <p class="eyebrow" id="moodLabel">Checking conditions</p>
+            <h3 id="verdictTitle">Loading verdict</h3>
+            <p class="summary" id="verdictSummary">
+              Pulling the latest station reading now.
+            </p>
+          </div>
+        </section>
+
+        <section class="metrics-grid">
+          <article class="metric-card">
+            <p class="metric-label">AQI</p>
+            <strong id="aqiValue">--</strong>
+          </article>
+          <article class="metric-card">
+            <p class="metric-label">Temperature</p>
+            <strong id="tempValue">--</strong>
+          </article>
+          <article class="metric-card">
+            <p class="metric-label">Humidity</p>
+            <strong id="humidityValue">--</strong>
+          </article>
+          <article class="metric-card">
+            <p class="metric-label">Dominant pollutant</p>
+            <strong id="pollutantValue">--</strong>
+          </article>
+        </section>
+
+        <section class="explain-card">
+          <div class="section-head">
+            <p class="section-label">Score</p>
+          </div>
+          <aside class="score-card solo-score-card">
+            <p class="score-label">Walk decision score</p>
+            <strong class="score-value" id="scoreValue">--</strong>
+            <p class="score-caption" id="scoreCaption">Loading score breakdown</p>
+          </aside>
+        </section>
+
+        <section class="explain-card rain-card">
+          <div class="section-head">
+            <p class="section-label">Rain Forecast</p>
+            <p class="subtle" id="rainSummary">Loading rain timeline...</p>
+          </div>
+          <div class="rain-timeline" id="rainTimeline"></div>
+        </section>
+      </article>
+
+      <aside class="side-column">
+        <section class="side-card">
+          <div class="section-head">
+            <p class="section-label">Stations</p>
+          </div>
+          <div class="station-list" id="stationList"></div>
+        </section>
+
+        <section class="side-card">
+          <div class="section-head">
+            <p class="section-label">Score legend</p>
+          </div>
+          <div class="score-legend side-legend">
+            <p class="score-legend-item"><strong>0-1</strong> Walk is good</p>
+            <p class="score-legend-item"><strong>2-3</strong> Keep it short</p>
+            <p class="score-legend-item"><strong>4+</strong> Better to skip</p>
+            <p class="score-legend-item"><strong>Hard stop</strong> AQI, heat, humidity, or rain crossed a safety threshold</p>
+          </div>
+        </section>
+
+        <section class="side-card">
+          <div class="section-head">
+            <p class="section-label">Data source</p>
+          </div>
+          <div class="source-list">
+            <p class="source-item">Air quality: World Air Quality Index Project and originating agencies.</p>
+            <p class="source-item">Rain forecast: Open-Meteo.</p>
+            <p class="source-item">This display is an unofficial convenience tool, not an official health advisory.</p>
+          </div>
+        </section>
+      </aside>
+    </section>
+  </main>
+
+  <script src="local-config.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
