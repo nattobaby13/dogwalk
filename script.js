@@ -322,23 +322,12 @@ function getRainIconMarkup(text = "") {
 function getRainAdjustmentFromForecast(text = "") {
   const lower = text.toLowerCase();
 
-  if (lower.includes("thundery") || lower.includes("showers")) {
+  if (lower.includes("thundery") || lower.includes("showers") || lower.includes("rain")) {
     return {
       hardStop: true,
       reasons: [
         `Regional forecast says "${text}".`,
-        "Showers or thundery conditions are enough to skip the walk for now."
-      ]
-    };
-  }
-
-  if (lower.includes("rain")) {
-    return {
-      hardStop: false,
-      capToBrief: true,
-      reasons: [
-        `Regional forecast says "${text}".`,
-        "Rain risk is enough to cap the verdict at 'Keep it short'."
+        "Rain conditions are enough to skip the walk for now."
       ]
     };
   }
