@@ -17,9 +17,6 @@
         <h1>Should we walk now?</h1>
       </div>
       <div class="topbar-actions">
-        <a class="link-pill topbar-link" href="https://ratwatchsg.netlify.app" target="_blank" rel="noreferrer">
-          Rat Watch SG - Help map rat sightings
-        </a>
         <div class="status-pill" id="statusMessage">Auto-refreshes every 10 min</div>
       </div>
     </header>
@@ -104,7 +101,7 @@
 
         <section class="explain-card rain-card">
           <div class="section-head">
-            <p class="section-label">Regional Rain Forecast</p>
+            <p class="section-label">2-Hour Weather Forecast</p>
             <p class="subtle" id="rainSummary">Loading NEA forecast...</p>
           </div>
           <div class="rain-timeline nea-rain-timeline" id="rainTimeline"></div>
@@ -131,11 +128,17 @@
             </div>
             <div class="source-item">
               <p class="source-title">Rain forecast</p>
-              <p class="source-text">NEA 24-hour regional forecast via data.gov.sg.</p>
+              <p class="source-text">NEA 2-hour area forecast via data.gov.sg.</p>
               <p class="source-updated" id="rainUpdated">Updated time unavailable</p>
             </div>
             <p class="source-item">This display is an unofficial convenience tool, not an official health advisory.</p>
           </div>
+        </section>
+
+        <section class="side-card">
+          <a class="link-pill side-link" href="https://ratwatchsg.netlify.app" target="_blank" rel="noreferrer">
+            Rat Watch SG - Help map rat sightings
+          </a>
         </section>
       </aside>
     </section>

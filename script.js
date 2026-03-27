@@ -150,14 +150,58 @@ function formatSingleTimeLabel(isoString) {
   });
 }
 
-function getStationRegion(name = "") {
-  const lower = name.toLowerCase();
-  if (lower.includes("east")) return "east";
-  if (lower.includes("west")) return "west";
-  if (lower.includes("north")) return "north";
-  if (lower.includes("south")) return "south";
-  if (lower.includes("central")) return "central";
-  return "central";
+function getCoordinatesFromDetail(detail) {
+  const geo = detail?.city?.geo;
+  if (Array.isArray(geo) && geo.length >= 2) {
+    const lat = Number(geo[0]);
+    const lon = Number(geo[1]);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      return { lat, lon };
+    }
+  }
+  return null;
+}
+
+function getCoordinatesFromStation(station) {
+  const lat = Number(station?.lat);
+  const lon = Number(station?.lon);
+  if (Number.isFinite(lat) && Number.isFinite(lon)) {
+    return { lat, lon };
+  }
+  return null;
+}
+
+function getNearestForecastArea(coordinates, areaMetadata = []) {
+  if (!coordinates) {
+    return null;
+  }
+
+  let nearest = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (const area of areaMetadata) {
+    const lat = Number(area?.label_location?.latitude);
+    const lon = Number(area?.label_location?.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      continue;
+    }
+
+    const distance = (coordinates.lat - lat) ** 2 + (coordinates.lon - lon) ** 2;
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      nearest = area;
+    }
+  }
+
+  return nearest;
+}
+
+function getForecastForArea(record, areaName) {
+  if (!record?.items?.length || !areaName) {
+    return null;
+  }
+
+  return record.items[0].forecasts?.find((entry) => entry.area === areaName) || null;
 }
 
 function getAqiPenalty(aqi) {
@@ -349,33 +393,32 @@ function getRainAdjustmentFromForecast(text = "") {
   };
 }
 
-function renderRainTimeline(record, region) {
-  const periods = record?.periods || [];
-  if (!periods.length) {
+function renderRainTimeline(record, areaName) {
+  const item = record?.items?.[0];
+  const forecast = getForecastForArea(record, areaName);
+
+  if (!item || !forecast) {
     els.rainSummary.textContent = "Rain forecast unavailable";
+    els.rainTimeline.classList.remove("two-hour");
     els.rainTimeline.innerHTML = "";
     return;
   }
 
-  const regionLabel = `${region.charAt(0).toUpperCase()}${region.slice(1)} region`;
-  els.rainSummary.textContent = regionLabel;
-  els.rainTimeline.innerHTML = periods.map((period) => {
-    const forecast = period.regions?.[region] || period.regions?.central || { text: "Forecast unavailable" };
-    const state = classifyRainText(forecast.text || "");
-    const startLabel = formatSingleTimeLabel(period.timePeriod?.start);
-    const endLabel = formatSingleTimeLabel(period.timePeriod?.end);
-
-    return `
-      <article class="rain-block ${state.key}">
-        <div class="rain-header">
-          <p class="rain-time">${startLabel} to ${endLabel}</p>
-          ${getRainIconMarkup(forecast.text || "")}
-        </div>
-        <p class="rain-label">${state.label}</p>
-        <p class="rain-detail">${forecast.text || "Forecast unavailable"}</p>
-      </article>
-    `;
-  }).join("");
+  const state = classifyRainText(forecast.forecast || "");
+  const startLabel = formatSingleTimeLabel(item.valid_period?.start);
+  const endLabel = formatSingleTimeLabel(item.valid_period?.end);
+  els.rainSummary.textContent = areaName;
+  els.rainTimeline.classList.add("two-hour");
+  els.rainTimeline.innerHTML = `
+    <article class="rain-block current-forecast ${state.key}">
+      <div class="rain-header">
+        <p class="rain-time">${startLabel} to ${endLabel}</p>
+        ${getRainIconMarkup(forecast.forecast || "")}
+      </div>
+      <p class="rain-label">${state.label}</p>
+      <p class="rain-detail">${forecast.forecast || "Forecast unavailable"}</p>
+    </article>
+  `;
 }
 
 function renderStations() {
@@ -448,6 +491,8 @@ async function loadStations() {
     .map((station) => ({
       uid: station.uid,
       aqi: station.aqi,
+      lat: station.lat,
+      lon: station.lon,
       name: normalizeName(station.station?.name || "Unnamed station")
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -464,21 +509,26 @@ async function loadStationDetail(uid) {
 }
 
 async function loadNeaForecast() {
-  const payload = await fetchJson("https://api-open.data.gov.sg/v2/real-time/api/twenty-four-hr-forecast");
-  if (payload.code !== 0 || !payload.data?.records?.length) {
-    throw new Error("Could not load NEA regional forecast.");
+  const payload = await fetchJson("https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast");
+  if (payload.code !== 0 || !payload.data?.items?.length) {
+    throw new Error("Could not load NEA 2-hour forecast.");
   }
-  return payload.data.records[0];
+  return payload.data;
 }
 
-async function enrichStationsWithVerdicts(baseStations) {
+async function enrichStationsWithVerdicts(baseStations, neaForecast) {
   const details = await Promise.all(baseStations.map(async (station) => {
     try {
       const detail = await loadStationDetail(station.uid);
       const aqi = Number(detail.aqi);
       const temp = Number(detail.iaqi?.t?.v);
       const humidity = Number(detail.iaqi?.h?.v);
-      const verdict = getVerdictDetails(aqi, temp, humidity).verdict;
+      const baseVerdict = getVerdictDetails(aqi, temp, humidity).verdict;
+      const coordinates = getCoordinatesFromDetail(detail) || getCoordinatesFromStation(station);
+      const nearestArea = getNearestForecastArea(coordinates, neaForecast?.area_metadata);
+      const forecastEntry = getForecastForArea(neaForecast, nearestArea?.name);
+      const rainAdjustment = getRainAdjustmentFromForecast(forecastEntry?.forecast || "");
+      const verdict = rainAdjustment.hardStop ? verdictMap.skip : baseVerdict;
 
       return {
         ...station,
@@ -500,6 +550,7 @@ async function refresh() {
   setStatus("Loading latest reported station data...");
 
   try {
+    const neaForecast = await loadNeaForecast();
     stations = await loadStations();
     if (!stations.length) {
       throw new Error("No Singapore stations available.");
@@ -510,16 +561,16 @@ async function refresh() {
       persistSelectedUid(stations[0].uid);
     }
 
-    stations = await enrichStationsWithVerdicts(stations);
+    stations = await enrichStationsWithVerdicts(stations, neaForecast);
     renderStations();
     const detail = await loadStationDetail(selectedUid);
-    const neaForecast = await loadNeaForecast();
-    const region = getStationRegion(detail.city?.name || "");
-    const currentForecast = neaForecast.periods?.[0]?.regions?.[region]?.text || neaForecast.periods?.[0]?.regions?.central?.text || "";
+    const coordinates = getCoordinatesFromDetail(detail);
+    const nearestArea = getNearestForecastArea(coordinates, neaForecast.area_metadata) || { name: "Unknown area" };
+    const currentForecast = getForecastForArea(neaForecast, nearestArea.name)?.forecast || "";
     const rainAdjustment = getRainAdjustmentFromForecast(currentForecast);
     renderDetail(detail, rainAdjustment);
-    renderRainTimeline(neaForecast, region);
-    els.rainUpdated.textContent = formatUpdatedLabel(neaForecast.updatedTimestamp, "NEA updated");
+    renderRainTimeline(neaForecast, nearestArea.name);
+    els.rainUpdated.textContent = formatUpdatedLabel(neaForecast.items?.[0]?.update_timestamp, "NEA updated");
     setStatus("Auto-refreshes every 10 min");
   } catch (error) {
     const localHint = window.location.protocol === "file:" && !LOCAL_TOKEN
