@@ -126,10 +126,10 @@
           <div class="section-head">
             <p class="section-label">Stations</p>
           </div>
-          <label class="station-select-wrap" for="stationSelect">
-            <span class="station-select-label">Choose station</span>
-            <select id="stationSelect" class="station-select" aria-label="Choose station"></select>
-          </label>
+          <button class="station-sheet-trigger" id="stationSheetTrigger" type="button">
+            <span class="station-sheet-label">Choose station</span>
+            <strong id="stationSheetValue">Loading station...</strong>
+          </button>
           <div class="station-list" id="stationList"></div>
         </section>
 
@@ -160,6 +160,20 @@
         </section>
       </aside>
     </section>
+
+    <div class="station-sheet" id="stationSheet" aria-hidden="true">
+      <button class="station-sheet-backdrop" id="stationSheetBackdrop" type="button" aria-label="Close station picker"></button>
+      <section class="station-sheet-panel" aria-label="Choose station">
+        <div class="station-sheet-head">
+          <div>
+            <p class="section-label">Stations</p>
+            <h2 class="station-sheet-title">Choose a station</h2>
+          </div>
+          <button class="station-sheet-close" id="stationSheetClose" type="button" aria-label="Close station picker">Close</button>
+        </div>
+        <div class="station-sheet-list" id="stationSheetList"></div>
+      </section>
+    </div>
   </main>
 
   <script src="local-config.js"></script>

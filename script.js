@@ -48,7 +48,12 @@ const els = {
   dayForecastTimeline: document.getElementById("dayForecastTimeline"),
   aqiUpdated: document.getElementById("aqiUpdated"),
   rainUpdated: document.getElementById("rainUpdated"),
-  stationSelect: document.getElementById("stationSelect"),
+  stationSheet: document.getElementById("stationSheet"),
+  stationSheetTrigger: document.getElementById("stationSheetTrigger"),
+  stationSheetValue: document.getElementById("stationSheetValue"),
+  stationSheetList: document.getElementById("stationSheetList"),
+  stationSheetBackdrop: document.getElementById("stationSheetBackdrop"),
+  stationSheetClose: document.getElementById("stationSheetClose"),
   stationList: document.getElementById("stationList")
 };
 
@@ -551,12 +556,10 @@ function renderDayForecast(record, region) {
 }
 
 function renderStations() {
-  els.stationSelect.innerHTML = stations.map((station) => {
-    const selected = Number(station.uid) === Number(selectedUid) ? " selected" : "";
-    return `<option value="${station.uid}"${selected}>${station.name}</option>`;
-  }).join("");
+  const selectedStation = getSelectedStation();
+  els.stationSheetValue.textContent = selectedStation?.name || "Choose station";
 
-  els.stationList.innerHTML = stations.map((station) => {
+  const stationMarkup = stations.map((station) => {
     const active = Number(station.uid) === Number(selectedUid);
     const listVerdict = station.verdict || verdictMap.brief;
     return `
@@ -566,6 +569,19 @@ function renderStations() {
       </button>
     `;
   }).join("");
+
+  els.stationList.innerHTML = stationMarkup;
+  els.stationSheetList.innerHTML = stationMarkup;
+}
+
+function openStationSheet() {
+  els.stationSheet.dataset.open = "true";
+  els.stationSheet.setAttribute("aria-hidden", "false");
+}
+
+function closeStationSheet() {
+  els.stationSheet.dataset.open = "false";
+  els.stationSheet.setAttribute("aria-hidden", "true");
 }
 
 function renderDetail(detail, rainAdjustment) {
@@ -781,6 +797,7 @@ document.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-uid]");
   if (button) {
     persistSelectedUid(button.dataset.uid);
+    closeStationSheet();
     try {
       await refreshSelectedStation();
     } catch (error) {
@@ -790,12 +807,13 @@ document.addEventListener("click", async (event) => {
   }
 });
 
-els.stationSelect.addEventListener("change", async (event) => {
-  persistSelectedUid(event.target.value);
-  try {
-    await refreshSelectedStation();
-  } catch (error) {
-    setStatus(error.message || "Unable to update station.", true);
+els.stationSheetTrigger.addEventListener("click", openStationSheet);
+els.stationSheetBackdrop.addEventListener("click", closeStationSheet);
+els.stationSheetClose.addEventListener("click", closeStationSheet);
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeStationSheet();
   }
 });
 
