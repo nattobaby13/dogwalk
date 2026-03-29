@@ -16,7 +16,8 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const url = `https://api.waqi.info/feed/@${encodeURIComponent(uid)}/?token=${encodeURIComponent(token)}`;
+  const pathSegment = /^[A-Za-z]/.test(String(uid)) ? String(uid) : `@${String(uid)}`;
+  const url = `https://api.waqi.info/feed/${encodeURIComponent(pathSegment)}/?token=${encodeURIComponent(token)}`;
 
   try {
     const response = await fetch(url);

@@ -4,7 +4,7 @@ const RAIN_HISTORY_KEY = "dog-walk-rain-history-v1";
 const RAIN_HISTORY_WINDOW_MS = 2 * 60 * 60 * 1000;
 const LOCAL_TOKEN = window.WAQI_LOCAL_TOKEN || null;
 const LOCAL_DATA_GOV_KEY = window.DATA_GOV_SG_API_KEY || null;
-const EAST_AQICN_UID = 538438;
+const EAST_AQICN_FEED_ID = "A538438";
 
 const verdictMap = {
   walk: {
@@ -371,7 +371,7 @@ function getRegionForCoordinates(coordinates) {
 
 function getAqiSourceUid({ coordinates, uid }) {
   if (getRegionForCoordinates(coordinates) === "east") {
-    return String(EAST_AQICN_UID);
+    return EAST_AQICN_FEED_ID;
   }
   return String(uid);
 }
@@ -1005,8 +1005,9 @@ async function loadStations() {
 }
 
 async function loadStationDetail(uid) {
+  const pathSegment = /^[A-Za-z]/.test(String(uid)) ? String(uid) : `@${String(uid)}`;
   const payload = window.location.protocol === "file:" && LOCAL_TOKEN
-    ? await fetchJson(`https://api.waqi.info/feed/@${encodeURIComponent(uid)}/?token=${encodeURIComponent(LOCAL_TOKEN)}`)
+    ? await fetchJson(`https://api.waqi.info/feed/${encodeURIComponent(pathSegment)}/?token=${encodeURIComponent(LOCAL_TOKEN)}`)
     : await fetchJson(`/api/station?uid=${encodeURIComponent(uid)}`);
   if (payload.status !== "ok") {
     throw new Error("Could not load station detail.");
