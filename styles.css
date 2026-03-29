@@ -784,6 +784,131 @@ h3 {
   display: block;
 }
 
+@media (min-width: 900px) and (max-width: 1366px) {
+  .screen {
+    width: min(1280px, 100%);
+    padding: 18px;
+  }
+
+  .topbar {
+    padding: 20px 22px;
+    gap: 20px;
+  }
+
+  .brand-subtitle {
+    max-width: 30rem;
+    font-size: 0.92rem;
+  }
+
+  .topbar-actions {
+    gap: 10px;
+  }
+
+  .clock-pill,
+  .status-pill {
+    padding: 11px 13px;
+  }
+
+  .dashboard {
+    grid-template-columns: minmax(0, 1.45fr) minmax(290px, 0.82fr);
+    gap: 16px;
+  }
+
+  .hero-card {
+    padding: 22px;
+  }
+
+  .decision-row {
+    grid-template-columns: 184px minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .dog-frame {
+    width: 184px;
+    height: 184px;
+  }
+
+  .dog-icon {
+    width: 126px;
+  }
+
+  .metrics-grid {
+    gap: 10px;
+  }
+
+  .metric-card {
+    padding: 14px 14px;
+  }
+
+  .metric-card strong {
+    font-size: 0.95rem;
+  }
+
+  .explain-card,
+  .side-card {
+    padding: 17px;
+  }
+
+  .score-row {
+    grid-template-columns: minmax(200px, 0.88fr) minmax(0, 1.12fr);
+  }
+
+  .rain-timeline,
+  #dayForecastTimeline {
+    gap: 8px;
+  }
+
+  .rain-block {
+    min-height: 102px;
+    padding: 12px 10px;
+  }
+
+  .rain-block.current-forecast {
+    padding: 14px 16px;
+  }
+
+  .station-item {
+    padding: 13px 14px;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1180px) {
+  .topbar {
+    align-items: flex-start;
+  }
+
+  .topbar-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    min-width: 190px;
+  }
+
+  .dashboard {
+    grid-template-columns: minmax(0, 1.34fr) minmax(260px, 0.86fr);
+  }
+
+  .decision-row {
+    grid-template-columns: 168px minmax(0, 1fr);
+  }
+
+  .dog-frame {
+    width: 168px;
+    height: 168px;
+  }
+
+  .dog-icon {
+    width: 116px;
+  }
+
+  .metrics-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .rain-time {
+    letter-spacing: 0.1em;
+  }
+}
+
 @media (max-width: 920px) {
   body {
     overflow: auto;
