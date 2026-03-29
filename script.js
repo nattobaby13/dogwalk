@@ -281,11 +281,21 @@ function getNearestForecastArea(coordinates, areaMetadata = []) {
 }
 
 function getForecastForArea(record, areaName) {
-  if (!record?.items?.length || !areaName) {
+  const items = record?.items || record?.records?.map((entry) => ({
+    update_timestamp: entry?.updatedTimestamp,
+    timestamp: entry?.timestamp,
+    valid_period: entry?.item?.validPeriod,
+    forecasts: entry?.item?.forecasts?.map((forecast) => ({
+      area: forecast?.name,
+      forecast: forecast?.forecast?.text || forecast?.forecast
+    }))
+  })) || [];
+
+  if (!items.length || !areaName) {
     return null;
   }
 
-  return record.items[0].forecasts?.find((entry) => entry.area === areaName) || null;
+  return items[0].forecasts?.find((entry) => entry.area === areaName) || null;
 }
 
 function getNearestPoint(coordinates, points, getLatLon) {
@@ -412,7 +422,7 @@ function getVerdictDetails(aqi, temp, humidity, wbgtReading) {
   if (Number.isFinite(aqi) && aqi >= 151) {
     return {
       verdict: verdictMap.skip,
-      scoreText: "Hard stop",
+      scoreText: "AQI stop",
       scoreCaption: "AQI threshold triggered",
       reasons: [
         `AQI ${aqi} is above the hard-stop threshold.`
@@ -423,7 +433,7 @@ function getVerdictDetails(aqi, temp, humidity, wbgtReading) {
   if (wbgtHeatStress === "high") {
     return {
       verdict: verdictMap.skip,
-      scoreText: "Hard stop",
+      scoreText: "WBGT stop",
       scoreCaption: "WBGT threshold triggered",
       reasons: [
         `WBGT ${formatWbgt(wbgtValue)} is at high heat stress.`
@@ -437,7 +447,7 @@ function getVerdictDetails(aqi, temp, humidity, wbgtReading) {
     if (fallbackWbgtPenalty >= 3) {
       return {
         verdict: verdictMap.skip,
-        scoreText: "Hard stop",
+        scoreText: "WBGT stop",
         scoreCaption: "WBGT threshold triggered",
         reasons: [
           `WBGT ${formatWbgt(wbgtValue)} is at or above the fallback heat threshold.`
@@ -474,7 +484,7 @@ function getVerdictDetails(aqi, temp, humidity, wbgtReading) {
   if (Number.isFinite(temp) && temp >= 35) {
     return {
       verdict: verdictMap.skip,
-      scoreText: "Hard stop",
+      scoreText: "Heat stop",
       scoreCaption: "Heat threshold triggered",
       reasons: [
         `Temperature ${Math.round(temp)} C is above the hard-stop heat threshold.`
@@ -485,7 +495,7 @@ function getVerdictDetails(aqi, temp, humidity, wbgtReading) {
   if (Number.isFinite(temp) && Number.isFinite(humidity) && temp >= 33 && humidity >= 85) {
     return {
       verdict: verdictMap.skip,
-      scoreText: "Hard stop",
+      scoreText: "Heat stop",
       scoreCaption: "Hot + humid threshold triggered",
       reasons: [
         `${Math.round(temp)} C with ${Math.round(humidity)}% humidity hits the hot-humid hard stop.`
@@ -496,7 +506,7 @@ function getVerdictDetails(aqi, temp, humidity, wbgtReading) {
   if (Number.isFinite(humidity) && humidity >= 95) {
     return {
       verdict: verdictMap.skip,
-      scoreText: "Hard stop",
+      scoreText: "Humidity stop",
       scoreCaption: "Humidity threshold triggered",
       reasons: [
         `Humidity ${Math.round(humidity)}% is above the hard-stop threshold.`
@@ -547,6 +557,31 @@ function getVerdictDetails(aqi, temp, humidity, wbgtReading) {
 function renderScore(scoreText, scoreCaption) {
   els.scoreValue.textContent = scoreText;
   els.scoreCaption.textContent = scoreCaption;
+}
+
+function renderLoadingState() {
+  els.heroCard.dataset.state = "walk";
+  els.stationName.textContent = "Loading station...";
+  els.stationMeta.textContent = "Singapore";
+  els.updatedAt.textContent = "Fetching latest reading";
+  els.moodLabel.textContent = "Updating";
+  els.verdictTitle.textContent = "Loading...";
+  els.verdictSummary.textContent = "Pulling the latest station, weather, and ground conditions now.";
+  els.aqiValue.textContent = "--";
+  els.tempValue.textContent = "--";
+  els.humidityValue.textContent = "--";
+  els.wbgtValue.textContent = "--";
+  els.rainNowIcon.innerHTML = "";
+  els.rainNowIcon.title = "Loading weather";
+  els.rainNowIcon.setAttribute("aria-label", "Loading weather");
+  els.groundValue.textContent = "--";
+  renderScore("--", "Loading score breakdown");
+  els.rainSummary.textContent = "Loading NEA forecast...";
+  els.rainTimeline.innerHTML = "";
+  els.dayForecastSummary.textContent = "Loading NEA day forecast...";
+  els.dayForecastTimeline.innerHTML = "";
+  els.pm25Summary.textContent = "Loading AQICN and data.gov values...";
+  els.pm25CompareDiagram.innerHTML = "";
 }
 
 function renderPm25Comparison(aqicnAqi, neaPm25, regionName) {
@@ -702,7 +737,7 @@ function getRainAdjustmentFromForecast(text = "") {
   if (lower.includes("thundery") || lower.includes("showers") || lower.includes("rain")) {
     return {
       hardStop: true,
-      scoreText: "Hard stop",
+      scoreText: "Rain stop",
       scoreCaption: "Rain forecast triggered",
       metricLabel: "Rain / showers",
       reasons: [
@@ -780,7 +815,7 @@ function evaluateGroundWetness(stationId, currentValue, timestamp) {
 }
 
 function renderRainTimeline(record, areaName) {
-  const item = record?.items?.[0];
+  const item = record?.items?.[0] || record?.records?.[0]?.item;
   const forecast = getForecastForArea(record, areaName);
 
   if (!item || !forecast) {
@@ -916,7 +951,7 @@ function renderDetail(detail, rainAdjustment) {
   if (rainAdjustment?.hardStop) {
     verdict = verdictMap.skip;
     reasons.push(...rainAdjustment.reasons);
-    scoreText = rainAdjustment.scoreText || "Hard stop";
+    scoreText = rainAdjustment.scoreText || "Rain stop";
     scoreCaption = `${result.scoreCaption} + rain`;
   } else if (rainAdjustment?.capToBrief && verdict.key === "walk") {
     verdict = verdictMap.brief;
@@ -986,10 +1021,27 @@ async function loadNeaForecast() {
       ? await fetchJsonWithHeaders("https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast", { "x-api-key": LOCAL_DATA_GOV_KEY })
       : await fetchJson("https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast"))
     : await fetchJson("/api/nea-two-hour");
-  if (payload.code !== 0 || !payload.data?.items?.length) {
+  if (payload.code !== 0 || !payload.data?.records?.length) {
     throw new Error("Could not load NEA 2-hour forecast.");
   }
-  return payload.data;
+  return {
+    area_metadata: payload.data.areaMetadata?.map((area) => ({
+      name: area?.name,
+      label_location: {
+        latitude: area?.labelLocation?.latitude,
+        longitude: area?.labelLocation?.longitude
+      }
+    })) || [],
+    items: payload.data.records.map((entry) => ({
+      update_timestamp: entry?.updatedTimestamp,
+      timestamp: entry?.timestamp,
+      valid_period: entry?.item?.validPeriod,
+      forecasts: (entry?.item?.forecasts || []).map((forecast) => ({
+        area: forecast?.name,
+        forecast: forecast?.forecast?.text || forecast?.forecast
+      }))
+    }))
+  };
 }
 
 async function loadNeaDayForecast() {
@@ -1173,6 +1225,7 @@ async function refreshSelectedStation() {
   }
 
   setStatus("Updating station...");
+  renderLoadingState();
   const [
     neaForecast,
     neaDayForecast,
