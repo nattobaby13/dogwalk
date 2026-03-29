@@ -167,7 +167,7 @@ function formatWbgt(value) {
 }
 
 function formatPm25(value) {
-  return Number.isFinite(value) ? `${Math.round(value)} ug/m3` : "--";
+  return Number.isFinite(value) ? `${Math.round(value)} µg/m³` : "--";
 }
 
 function formatRelativeMinutes(isoString) {
@@ -354,6 +354,26 @@ function getWbgtPenalty(heatStress) {
   return null;
 }
 
+function getNumericWbgtPenalty(wbgtValue) {
+  if (!Number.isFinite(wbgtValue)) {
+    return null;
+  }
+
+  if (wbgtValue >= 32) {
+    return 3;
+  }
+
+  if (wbgtValue >= 30) {
+    return 2;
+  }
+
+  if (wbgtValue >= 28) {
+    return 1;
+  }
+
+  return 0;
+}
+
 function convertPm25ToAqi(value) {
   if (!Number.isFinite(value) || value < 0) {
     return null;
@@ -412,9 +432,21 @@ function getVerdictDetails(aqi, temp, humidity, wbgtReading) {
   }
 
   const wbgtPenalty = getWbgtPenalty(wbgtHeatStress);
-  if (wbgtPenalty !== null) {
+  const fallbackWbgtPenalty = wbgtPenalty ?? getNumericWbgtPenalty(wbgtValue);
+  if (fallbackWbgtPenalty !== null) {
+    if (fallbackWbgtPenalty >= 3) {
+      return {
+        verdict: verdictMap.skip,
+        scoreText: "Hard stop",
+        scoreCaption: "WBGT threshold triggered",
+        reasons: [
+          `WBGT ${formatWbgt(wbgtValue)} is at or above the fallback heat threshold.`
+        ]
+      };
+    }
+
     const aqiPenalty = getAqiPenalty(aqi);
-    const total = aqiPenalty + wbgtPenalty;
+    const total = aqiPenalty + fallbackWbgtPenalty;
     let verdict = verdictMap.skip;
     if (total <= 1) {
       verdict = verdictMap.walk;
@@ -432,10 +464,10 @@ function getVerdictDetails(aqi, temp, humidity, wbgtReading) {
         Number.isFinite(aqi)
           ? `AQI ${aqi} adds ${aqiPenalty} point${aqiPenalty === 1 ? "" : "s"}.`
           : "AQI unavailable, so the app uses a conservative AQI penalty.",
-        `WBGT ${formatWbgt(wbgtValue)} is ${wbgtReading.heatStress || "unknown"}, adding ${wbgtPenalty} point${wbgtPenalty === 1 ? "" : "s"}.`
+        `WBGT ${formatWbgt(wbgtValue)} is ${wbgtReading?.heatStress || "estimated by fallback bands"}, adding ${fallbackWbgtPenalty} point${fallbackWbgtPenalty === 1 ? "" : "s"}.`
       ],
       scoreText: String(total),
-      scoreCaption: `${aqiPenalty} AQI + ${wbgtPenalty} WBGT`
+      scoreCaption: `${aqiPenalty} AQI + ${fallbackWbgtPenalty} WBGT`
     };
   }
 
@@ -587,6 +619,26 @@ function normalizeDayForecastText(value) {
   }
 
   return "";
+}
+
+function getDayForecastPeriods(record) {
+  if (!record) {
+    return [];
+  }
+
+  return (record.periods || []).map((period) => ({
+    start: period?.time?.start || period?.timePeriod?.start,
+    end: period?.time?.end || period?.timePeriod?.end,
+    regions: period?.regions || {}
+  })).filter((period) => {
+    const start = new Date(period.start).getTime();
+    const end = new Date(period.end).getTime();
+    return Number.isFinite(start) && Number.isFinite(end) && end > start;
+  });
+}
+
+function getDayForecastRegionText(period, region) {
+  return normalizeDayForecastText(period?.regions?.[region] || period?.regions?.central);
 }
 
 function getSingaporeDateParts(isoString) {
@@ -756,11 +808,7 @@ function renderRainTimeline(record, areaName) {
 }
 
 function renderDayForecast(record, region) {
-  const periods = (record?.periods || []).filter((period) => {
-    const start = new Date(period?.time?.start).getTime();
-    const end = new Date(period?.time?.end).getTime();
-    return Number.isFinite(start) && Number.isFinite(end) && end > start;
-  });
+  const periods = getDayForecastPeriods(record);
   if (!periods.length) {
     els.dayForecastSummary.textContent = "Day forecast unavailable";
     els.dayForecastTimeline.innerHTML = "";
@@ -769,9 +817,10 @@ function renderDayForecast(record, region) {
 
   const regionLabel = `${region.charAt(0).toUpperCase()}${region.slice(1)} region`;
   els.dayForecastSummary.textContent = regionLabel;
-  const forecastDateKey = record?.valid_period?.start
-    ? getSingaporeDateParts(record.valid_period.start).dateKey
-    : getSingaporeDateParts(periods[0].time.start).dateKey;
+  const validPeriodStart = record?.valid_period?.start || record?.general?.validPeriod?.start;
+  const forecastDateKey = validPeriodStart
+    ? getSingaporeDateParts(validPeriodStart).dateKey
+    : getSingaporeDateParts(periods[0].start).dateKey;
 
   const bucketMap = {
     Morning: null,
@@ -780,8 +829,8 @@ function renderDayForecast(record, region) {
   };
 
   for (const period of periods) {
-    const startParts = getSingaporeDateParts(period.time?.start);
-    const endParts = getSingaporeDateParts(period.time?.end);
+    const startParts = getSingaporeDateParts(period.start);
+    const endParts = getSingaporeDateParts(period.end);
 
     if (startParts.dateKey === forecastDateKey && startParts.hour === 6 && endParts.hour === 12) {
       bucketMap.Morning = period;
@@ -798,8 +847,8 @@ function renderDayForecast(record, region) {
 
   if (!bucketMap.Night) {
     bucketMap.Night = periods.find((period) => {
-      const startParts = getSingaporeDateParts(period.time?.start);
-      const endParts = getSingaporeDateParts(period.time?.end);
+      const startParts = getSingaporeDateParts(period.start);
+      const endParts = getSingaporeDateParts(period.end);
       return startParts.dateKey === forecastDateKey && startParts.hour === 0 && endParts.hour === 6;
     }) || null;
   }
@@ -809,7 +858,7 @@ function renderDayForecast(record, region) {
     .filter(([, period]) => period);
 
   els.dayForecastTimeline.innerHTML = orderedBuckets.map(([bucketLabel, period]) => {
-    const forecastText = normalizeDayForecastText(period.regions?.[region] || period.regions?.central);
+    const forecastText = getDayForecastRegionText(period, region);
     const state = classifyRainText(forecastText);
 
     return `
@@ -890,6 +939,8 @@ function renderDetail(detail, rainAdjustment) {
   els.humidityValue.textContent = formatHumidity(humidity);
   els.wbgtValue.textContent = formatWbgt(Number(rainAdjustment?.wbgtReading?.wbgt));
   els.rainNowIcon.innerHTML = getRainIconMarkup(rainAdjustment?.metricLabel || "");
+  els.rainNowIcon.title = rainAdjustment?.metricLabel || "Weather description unavailable";
+  els.rainNowIcon.setAttribute("aria-label", rainAdjustment?.metricLabel || "Weather description unavailable");
   els.groundValue.textContent = rainAdjustment?.groundLabel || "--";
   renderScore(scoreText, scoreCaption);
   els.aqiUpdated.textContent = formatUpdatedLabel(detail.time?.iso, "AQICN updated");
@@ -943,12 +994,14 @@ async function loadNeaForecast() {
 
 async function loadNeaDayForecast() {
   const payload = window.location.protocol === "file:"
-    ? await fetchJson("https://api.data.gov.sg/v1/environment/24-hour-weather-forecast")
+    ? (LOCAL_DATA_GOV_KEY
+      ? await fetchJsonWithHeaders("https://api-open.data.gov.sg/v2/real-time/api/twenty-four-hr-forecast", { "x-api-key": LOCAL_DATA_GOV_KEY })
+      : await fetchJson("https://api-open.data.gov.sg/v2/real-time/api/twenty-four-hr-forecast"))
     : await fetchJson("/api/nea-two-hour?mode=day");
-  if (!payload.items?.length) {
+  if (payload.code !== 0 || !payload.data?.records?.length) {
     return null;
   }
-  return payload.items[0];
+  return payload.data.records[0];
 }
 
 async function loadRainfallReadings() {
@@ -1076,8 +1129,8 @@ async function renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallD
   const forecastUpdated = formatUpdatedLabel(neaForecast.items?.[0]?.update_timestamp, "Forecast");
   const rainfallUpdated = formatUpdatedLabel(latestRainReading?.timestamp, "Rainfall");
   const wbgtUpdated = formatUpdatedLabel(wbgtData?.records?.[0]?.updatedTimestamp, "WBGT");
-  const dayForecastUpdated = neaDayForecast?.update_timestamp
-    ? formatUpdatedLabel(neaDayForecast.update_timestamp, "24h")
+  const dayForecastUpdated = neaDayForecast?.updatedTimestamp
+    ? formatUpdatedLabel(neaDayForecast.updatedTimestamp, "24h")
     : "24h unavailable";
   els.rainUpdated.textContent = `${wbgtUpdated} | ${forecastUpdated} | ${dayForecastUpdated} | ${rainfallUpdated}`;
 }

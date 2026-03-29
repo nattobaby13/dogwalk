@@ -610,11 +610,13 @@ h3 {
 .rain-header {
   display: flex;
   justify-content: space-between;
-  align-items: start;
+  align-items: flex-start;
   gap: 8px;
+  min-width: 0;
 }
 
 .rain-icon {
+  display: block;
   width: 22px;
   height: 22px;
   color: var(--text);
@@ -654,6 +656,8 @@ h3 {
   text-transform: uppercase;
   letter-spacing: 0.14em;
   font-size: 0.68rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .rain-label {
@@ -867,6 +871,11 @@ h3 {
 
   .rain-timeline {
     grid-template-columns: 1fr;
+  }
+
+  .rain-icon {
+    width: 18px;
+    height: 18px;
   }
 
   .compare-row {

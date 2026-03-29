@@ -12,9 +12,9 @@ module.exports = async (req, res) => {
   try {
     const useDayMode = mode === "day";
     const upstreamUrl = useDayMode
-      ? "https://api.data.gov.sg/v1/environment/24-hour-weather-forecast"
+      ? "https://api-open.data.gov.sg/v2/real-time/api/twenty-four-hr-forecast"
       : "https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast";
-    const response = await fetch(upstreamUrl, useDayMode ? undefined : {
+    const response = await fetch(upstreamUrl, {
       headers: {
         "x-api-key": apiKey
       }

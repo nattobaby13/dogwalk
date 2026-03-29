@@ -64,7 +64,7 @@
 
         <section class="metrics-grid">
           <article class="metric-card">
-            <p class="metric-label">AQI (PM2.5)</p>
+            <p class="metric-label">AQI</p>
             <strong id="aqiValue">--</strong>
           </article>
           <article class="metric-card">
@@ -82,7 +82,7 @@
           <article class="metric-card">
             <p class="metric-label">Weather</p>
             <div class="metric-weather">
-              <span id="rainNowIcon" aria-hidden="true"></span>
+              <span id="rainNowIcon" aria-hidden="true" title="Weather description unavailable"></span>
             </div>
           </article>
           <article class="metric-card">
@@ -106,7 +106,7 @@
               <p class="score-legend-item"><strong>0-1</strong> Walk is good</p>
               <p class="score-legend-item"><strong>2-3</strong> Keep it short</p>
               <p class="score-legend-item"><strong>4+</strong> Better to skip</p>
-              <p class="score-legend-item"><strong>Hard stop</strong> AQI, WBGT, heat, humidity, or rain crossed a safety threshold</p>
+              <p class="score-legend-item"><strong>Hard stop</strong> AQI, WBGT, or rain crossed a safety threshold</p>
             </aside>
           </div>
         </section>
@@ -160,12 +160,11 @@
             </div>
             <div class="source-item">
               <p class="source-title">PM2.5 comparison</p>
-              <p class="source-text">data.gov.sg PM2.5 is a regional raw concentration in micrograms per cubic meter. Pawcaster estimates a PM2.5 AQI from that value for comparison only.</p>
+              <p class="source-text">data.gov.sg PM2.5 is a regional raw concentration in µg/m³. Pawcaster estimates a PM2.5 AQI from that value for comparison only.</p>
             </div>
             <div class="source-item">
               <p class="source-title">Weather / WBGT / Rain</p>
               <p class="source-text">NEA WBGT observations, 2-hour area forecast, 24-hour regional forecast, and 5-minute rainfall readings via data.gov.sg.</p>
-              <p class="source-text">Ground wetness uses the nearest rainfall gauge and recent samples collected on this device.</p>
               <p class="source-updated" id="rainUpdated">Updated time unavailable</p>
             </div>
             <p class="source-item">This display is an unofficial convenience tool, not an official health advisory.</p>
