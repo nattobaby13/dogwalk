@@ -167,6 +167,28 @@ function getDisplayedAqi(detail) {
   return Number.isFinite(stationAqi) ? stationAqi : NaN;
 }
 
+function mergeAqiSourceDetail(baseDetail, aqiSourceDetail) {
+  if (!aqiSourceDetail) {
+    return baseDetail;
+  }
+
+  const merged = {
+    ...baseDetail,
+    aqi: aqiSourceDetail?.aqi,
+    dominentpol: aqiSourceDetail?.dominentpol || baseDetail?.dominentpol,
+    iaqi: {
+      ...(baseDetail?.iaqi || {})
+    }
+  };
+
+  const dominantKey = String(aqiSourceDetail?.dominentpol || "").toLowerCase();
+  if (dominantKey && aqiSourceDetail?.iaqi?.[dominantKey]) {
+    merged.iaqi[dominantKey] = aqiSourceDetail.iaqi[dominantKey];
+  }
+
+  return merged;
+}
+
 function formatTemperature(value) {
   return Number.isFinite(value) ? `${Math.round(value)} C` : "--";
 }
@@ -908,7 +930,7 @@ function closeStationSheet() {
   els.stationSheet.setAttribute("aria-hidden", "true");
 }
 
-function renderDetail(detail, rainAdjustment) {
+function renderDetail(detail, rainAdjustment, displayContext = {}) {
   const aqi = getDisplayedAqi(detail);
   const temp = Number(detail.iaqi?.t?.v);
   const humidity = Number(detail.iaqi?.h?.v);
@@ -933,8 +955,8 @@ function renderDetail(detail, rainAdjustment) {
   }
 
   els.heroCard.dataset.state = verdict.key;
-  els.stationName.textContent = normalizeName(detail.city?.name || "Selected station");
-  els.stationMeta.textContent = "Singapore";
+  els.stationName.textContent = normalizeName(displayContext.stationName || detail.city?.name || "Selected station");
+  els.stationMeta.textContent = displayContext.stationMeta || "Singapore";
   els.updatedAt.textContent = formatObservedTime(detail.time);
   els.moodLabel.textContent = verdict.mood;
   els.verdictTitle.textContent = verdict.title;
@@ -1073,11 +1095,15 @@ async function enrichStationsWithVerdicts(baseStations, neaForecast, wbgtData) {
   const wbgtReadings = wbgtData?.records?.[0]?.item?.readings || [];
   const details = await Promise.all(baseStations.map(async (station) => {
     try {
+      const stationDetail = await loadStationDetail(station.uid);
       const sourceUid = getAqiSourceUid({
         coordinates: getCoordinatesFromStation(station),
         uid: station.uid
       });
-      const detail = await loadStationDetail(sourceUid);
+      const aqiSourceDetail = String(sourceUid) === String(station.uid)
+        ? stationDetail
+        : await loadStationDetail(sourceUid);
+      const detail = mergeAqiSourceDetail(stationDetail, aqiSourceDetail);
       const aqi = getDisplayedAqi(detail);
       const temp = Number(detail.iaqi?.t?.v);
       const humidity = Number(detail.iaqi?.h?.v);
@@ -1119,10 +1145,17 @@ async function renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallD
     coordinates: selectedCoordinates,
     uid: selectedUid
   });
-  const detail = await loadOptional(
-    () => loadStationDetail(sourceUid),
+  const stationDetail = await loadOptional(
+    () => loadStationDetail(selectedUid),
     createFallbackDetail(selectedStation)
   );
+  const aqiSourceDetail = String(sourceUid) === String(selectedUid)
+    ? stationDetail
+    : await loadOptional(
+      () => loadStationDetail(sourceUid),
+      stationDetail
+    );
+  const detail = mergeAqiSourceDetail(stationDetail, aqiSourceDetail);
   const fallbackCoordinates = selectedCoordinates;
   const coordinates = getCoordinatesFromDetail(detail) || fallbackCoordinates;
   const nearestArea = getNearestForecastArea(coordinates, neaForecast?.area_metadata) || { name: "Unknown area" };
@@ -1154,7 +1187,10 @@ async function renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallD
   );
   rainAdjustment.groundLabel = groundLabel;
   rainAdjustment.wbgtReading = wbgtReading;
-  renderDetail(detail, rainAdjustment);
+  renderDetail(detail, rainAdjustment, {
+    stationName: selectedStation?.name,
+    stationMeta: "Singapore"
+  });
   renderRainTimeline(neaForecast, nearestArea.name);
   renderDayForecast(neaDayForecast, dayForecastRegion);
   const forecastUpdated = formatUpdatedLabel(neaForecast.items?.[0]?.update_timestamp, "Forecast");
