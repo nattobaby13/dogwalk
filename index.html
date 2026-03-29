@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260329b">
+  <link rel="stylesheet" href="styles.css?v=20260329c">
 </head>
 <body>
   <main class="screen">
@@ -76,6 +76,10 @@
             <strong id="humidityValue">--</strong>
           </article>
           <article class="metric-card">
+            <p class="metric-label">WBGT</p>
+            <strong id="wbgtValue">--</strong>
+          </article>
+          <article class="metric-card">
             <p class="metric-label">Weather</p>
             <div class="metric-weather">
               <span id="rainNowIcon" aria-hidden="true"></span>
@@ -103,7 +107,7 @@
               <p class="score-legend-item"><strong>0-1</strong> Walk is good</p>
               <p class="score-legend-item"><strong>2-3</strong> Keep it short</p>
               <p class="score-legend-item"><strong>4+</strong> Better to skip</p>
-              <p class="score-legend-item"><strong>Hard stop</strong> AQI, heat, humidity, or rain crossed a safety threshold</p>
+              <p class="score-legend-item"><strong>Hard stop</strong> AQI, WBGT, heat, humidity, or rain crossed a safety threshold</p>
             </aside>
           </div>
         </section>
@@ -148,8 +152,8 @@
               <p class="source-updated" id="aqiUpdated">Updated time unavailable</p>
             </div>
             <div class="source-item">
-              <p class="source-title">Rain forecast</p>
-              <p class="source-text">NEA 2-hour area forecast, 24-hour regional forecast, and 5-minute rainfall readings via data.gov.sg.</p>
+              <p class="source-title">Weather / WBGT / Rain</p>
+              <p class="source-text">NEA WBGT observations, 2-hour area forecast, 24-hour regional forecast, and 5-minute rainfall readings via data.gov.sg.</p>
               <p class="source-text">Ground wetness uses the nearest rainfall gauge and recent samples collected on this device.</p>
               <p class="source-updated" id="rainUpdated">Updated time unavailable</p>
             </div>
@@ -183,7 +187,7 @@
   <script>
     (function bootApp() {
       const appScript = document.createElement("script");
-      appScript.src = "script.js?v=20260329d";
+      appScript.src = "script.js?v=20260329e";
 
       if (window.location.protocol === "file:") {
         const localConfigScript = document.createElement("script");

@@ -38,6 +38,7 @@ const els = {
   aqiValue: document.getElementById("aqiValue"),
   tempValue: document.getElementById("tempValue"),
   humidityValue: document.getElementById("humidityValue"),
+  wbgtValue: document.getElementById("wbgtValue"),
   rainNowIcon: document.getElementById("rainNowIcon"),
   rainNowValue: document.getElementById("rainNowValue"),
   groundValue: document.getElementById("groundValue"),
@@ -119,6 +120,10 @@ function formatTemperature(value) {
 
 function formatHumidity(value) {
   return Number.isFinite(value) ? `${Math.round(value)}%` : "--";
+}
+
+function formatWbgt(value) {
+  return Number.isFinite(value) ? `${value.toFixed(1)} C` : "--";
 }
 
 function formatRelativeMinutes(isoString) {
@@ -297,7 +302,18 @@ function getHumidityPenalty(humidity) {
   return 0;
 }
 
-function getVerdictDetails(aqi, temp, humidity) {
+function getWbgtPenalty(heatStress) {
+  const level = String(heatStress || "").toLowerCase();
+  if (level === "high") return 3;
+  if (level === "moderate") return 2;
+  if (level === "low") return 0;
+  return null;
+}
+
+function getVerdictDetails(aqi, temp, humidity, wbgtReading) {
+  const wbgtValue = Number(wbgtReading?.wbgt);
+  const wbgtHeatStress = String(wbgtReading?.heatStress || "").toLowerCase();
+
   if (Number.isFinite(aqi) && aqi >= 151) {
     return {
       verdict: verdictMap.skip,
@@ -306,6 +322,45 @@ function getVerdictDetails(aqi, temp, humidity) {
       reasons: [
         `AQI ${aqi} is above the hard-stop threshold.`
       ]
+    };
+  }
+
+  if (wbgtHeatStress === "high") {
+    return {
+      verdict: verdictMap.skip,
+      scoreText: "Hard stop",
+      scoreCaption: "WBGT threshold triggered",
+      reasons: [
+        `WBGT ${formatWbgt(wbgtValue)} is at high heat stress.`
+      ]
+    };
+  }
+
+  const wbgtPenalty = getWbgtPenalty(wbgtHeatStress);
+  if (wbgtPenalty !== null) {
+    const aqiPenalty = getAqiPenalty(aqi);
+    const total = aqiPenalty + wbgtPenalty;
+    let verdict = verdictMap.skip;
+    if (total <= 1) {
+      verdict = verdictMap.walk;
+    } else if (total <= 3) {
+      verdict = verdictMap.brief;
+    }
+
+    if (Number.isFinite(aqi) && aqi >= 101 && verdict.key === "walk") {
+      verdict = verdictMap.brief;
+    }
+
+    return {
+      verdict,
+      reasons: [
+        Number.isFinite(aqi)
+          ? `AQI ${aqi} adds ${aqiPenalty} point${aqiPenalty === 1 ? "" : "s"}.`
+          : "AQI unavailable, so the app uses a conservative AQI penalty.",
+        `WBGT ${formatWbgt(wbgtValue)} is ${wbgtReading.heatStress || "unknown"}, adding ${wbgtPenalty} point${wbgtPenalty === 1 ? "" : "s"}.`
+      ],
+      scoreText: String(total),
+      scoreCaption: `${aqiPenalty} AQI + ${wbgtPenalty} WBGT`
     };
   }
 
@@ -624,7 +679,7 @@ function renderDetail(detail, rainAdjustment) {
   const aqi = Number(detail.aqi);
   const temp = Number(detail.iaqi?.t?.v);
   const humidity = Number(detail.iaqi?.h?.v);
-  let result = getVerdictDetails(aqi, temp, humidity);
+  let result = getVerdictDetails(aqi, temp, humidity, rainAdjustment?.wbgtReading);
   let verdict = result.verdict;
   const reasons = [...result.reasons];
   let scoreText = result.scoreText;
@@ -654,6 +709,7 @@ function renderDetail(detail, rainAdjustment) {
   els.aqiValue.textContent = Number.isFinite(aqi) ? String(aqi) : "--";
   els.tempValue.textContent = formatTemperature(temp);
   els.humidityValue.textContent = formatHumidity(humidity);
+  els.wbgtValue.textContent = formatWbgt(Number(rainAdjustment?.wbgtReading?.wbgt));
   els.rainNowIcon.innerHTML = getRainIconMarkup(rainAdjustment?.metricLabel || "");
   els.rainNowValue.textContent = rainAdjustment?.metricLabel || "--";
   els.groundValue.textContent = rainAdjustment?.groundLabel || "--";
@@ -725,15 +781,34 @@ async function loadRainfallReadings() {
   return payload.data;
 }
 
-async function enrichStationsWithVerdicts(baseStations, neaForecast) {
+async function loadWbgtReadings() {
+  const payload = window.location.protocol === "file:"
+    ? await fetchJson("https://api-open.data.gov.sg/v2/real-time/api/weather?api=wbgt")
+    : await fetchJson("/api/nea-wbgt");
+  if (payload.code !== 0 || !payload.data?.records?.length) {
+    throw new Error("Could not load NEA WBGT observations.");
+  }
+  return payload.data;
+}
+
+async function enrichStationsWithVerdicts(baseStations, neaForecast, wbgtData) {
+  const wbgtReadings = wbgtData?.records?.[0]?.item?.readings || [];
   const details = await Promise.all(baseStations.map(async (station) => {
     try {
       const detail = await loadStationDetail(station.uid);
       const aqi = Number(detail.aqi);
       const temp = Number(detail.iaqi?.t?.v);
       const humidity = Number(detail.iaqi?.h?.v);
-      const baseVerdict = getVerdictDetails(aqi, temp, humidity).verdict;
       const coordinates = getCoordinatesFromDetail(detail) || getCoordinatesFromStation(station);
+      const wbgtReading = getNearestPoint(
+        coordinates,
+        wbgtReadings,
+        (reading) => ({
+          lat: Number(reading?.location?.latitude),
+          lon: Number(reading?.location?.longitude)
+        })
+      );
+      const baseVerdict = getVerdictDetails(aqi, temp, humidity, wbgtReading).verdict;
       const nearestArea = getNearestForecastArea(coordinates, neaForecast?.area_metadata);
       const forecastEntry = getForecastForArea(neaForecast, nearestArea?.name);
       const rainAdjustment = getRainAdjustmentFromForecast(forecastEntry?.forecast || "");
@@ -747,7 +822,7 @@ async function enrichStationsWithVerdicts(baseStations, neaForecast) {
     } catch {
       return {
         ...station,
-        verdict: getVerdictDetails(Number(station.aqi), NaN, NaN).verdict
+        verdict: getVerdictDetails(Number(station.aqi), NaN, NaN, null).verdict
       };
     }
   }));
@@ -755,7 +830,7 @@ async function enrichStationsWithVerdicts(baseStations, neaForecast) {
   return details;
 }
 
-async function renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallData) {
+async function renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallData, wbgtData) {
   const detail = await loadStationDetail(selectedUid);
   const fallbackCoordinates = getCoordinatesFromStation(getSelectedStation());
   const coordinates = getCoordinatesFromDetail(detail) || fallbackCoordinates;
@@ -763,6 +838,14 @@ async function renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallD
   const dayForecastRegion = getRegionForCoordinates(coordinates);
   const currentForecast = getForecastForArea(neaForecast, nearestArea.name)?.forecast || "";
   const rainAdjustment = getRainAdjustmentFromForecast(currentForecast);
+  const wbgtReading = getNearestPoint(
+    coordinates,
+    wbgtData?.records?.[0]?.item?.readings || [],
+    (reading) => ({
+      lat: Number(reading?.location?.latitude),
+      lon: Number(reading?.location?.longitude)
+    })
+  );
   const nearestRainStation = getNearestPoint(
     coordinates,
     rainfallData.stations,
@@ -779,15 +862,17 @@ async function renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallD
     latestRainReading?.timestamp
   );
   rainAdjustment.groundLabel = groundLabel;
+  rainAdjustment.wbgtReading = wbgtReading;
   renderDetail(detail, rainAdjustment);
   renderRainTimeline(neaForecast, nearestArea.name);
   renderDayForecast(neaDayForecast, dayForecastRegion);
   const forecastUpdated = formatUpdatedLabel(neaForecast.items?.[0]?.update_timestamp, "Forecast");
   const rainfallUpdated = formatUpdatedLabel(latestRainReading?.timestamp, "Rainfall");
+  const wbgtUpdated = formatUpdatedLabel(wbgtData?.records?.[0]?.updatedTimestamp, "WBGT");
   const dayForecastUpdated = neaDayForecast?.update_timestamp
     ? formatUpdatedLabel(neaDayForecast.update_timestamp, "24h")
     : "24h unavailable";
-  els.rainUpdated.textContent = `${forecastUpdated} | ${dayForecastUpdated} | ${rainfallUpdated}`;
+  els.rainUpdated.textContent = `${wbgtUpdated} | ${forecastUpdated} | ${dayForecastUpdated} | ${rainfallUpdated}`;
 }
 
 async function refreshAll() {
@@ -796,6 +881,7 @@ async function refreshAll() {
   const neaForecast = await loadNeaForecast();
   const neaDayForecast = await loadNeaDayForecast();
   const rainfallData = await loadRainfallReadings();
+  const wbgtData = await loadWbgtReadings();
   stations = await loadStations();
   if (!stations.length) {
     throw new Error("No Singapore stations available.");
@@ -806,9 +892,9 @@ async function refreshAll() {
     persistSelectedUid(stations[0].uid);
   }
 
-  stations = await enrichStationsWithVerdicts(stations, neaForecast);
+  stations = await enrichStationsWithVerdicts(stations, neaForecast, wbgtData);
   renderStations();
-  await renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallData);
+  await renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallData, wbgtData);
   setStatus("Auto-refreshes every 10 min");
 }
 
@@ -821,8 +907,9 @@ async function refreshSelectedStation() {
   const neaForecast = await loadNeaForecast();
   const neaDayForecast = await loadNeaDayForecast();
   const rainfallData = await loadRainfallReadings();
+  const wbgtData = await loadWbgtReadings();
   renderStations();
-  await renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallData);
+  await renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallData, wbgtData);
   setStatus("Auto-refreshes every 10 min");
 }
 
