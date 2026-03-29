@@ -3,6 +3,7 @@ const SELECTED_STATION_KEY = "dog-walk-selected-station-v2";
 const RAIN_HISTORY_KEY = "dog-walk-rain-history-v1";
 const RAIN_HISTORY_WINDOW_MS = 2 * 60 * 60 * 1000;
 const LOCAL_TOKEN = window.WAQI_LOCAL_TOKEN || null;
+const LOCAL_DATA_GOV_KEY = window.DATA_GOV_SG_API_KEY || null;
 
 const verdictMap = {
   walk: {
@@ -71,6 +72,14 @@ function setStatus(message, isError = false) {
 
 async function fetchJson(url) {
   const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Request failed with status ${response.status}`);
+  }
+  return response.json();
+}
+
+async function fetchJsonWithHeaders(url, headers) {
+  const response = await fetch(url, { headers });
   if (!response.ok) {
     throw new Error(`Request failed with status ${response.status}`);
   }
@@ -660,7 +669,9 @@ async function loadStationDetail(uid) {
 }
 
 async function loadNeaForecast() {
-  const payload = await fetchJson("https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast");
+  const payload = window.location.protocol === "file:" && LOCAL_DATA_GOV_KEY
+    ? await fetchJsonWithHeaders("https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast", { "x-api-key": LOCAL_DATA_GOV_KEY })
+    : await fetchJson("/api/nea-two-hour");
   if (payload.code !== 0 || !payload.data?.items?.length) {
     throw new Error("Could not load NEA 2-hour forecast.");
   }
@@ -668,7 +679,9 @@ async function loadNeaForecast() {
 }
 
 async function loadNeaDayForecast() {
-  const payload = await fetchJson("https://api-open.data.gov.sg/v2/real-time/api/twenty-four-hr-forecast");
+  const payload = window.location.protocol === "file:" && LOCAL_DATA_GOV_KEY
+    ? await fetchJsonWithHeaders("https://api-open.data.gov.sg/v2/real-time/api/twenty-four-hr-forecast", { "x-api-key": LOCAL_DATA_GOV_KEY })
+    : await fetchJson("/api/nea-twenty-four-hour");
   if (payload.code !== 0 || !payload.data?.records?.length) {
     throw new Error("Could not load NEA 24-hour forecast.");
   }
@@ -676,7 +689,9 @@ async function loadNeaDayForecast() {
 }
 
 async function loadRainfallReadings() {
-  const payload = await fetchJson("https://api-open.data.gov.sg/v2/real-time/api/rainfall");
+  const payload = window.location.protocol === "file:" && LOCAL_DATA_GOV_KEY
+    ? await fetchJsonWithHeaders("https://api-open.data.gov.sg/v2/real-time/api/rainfall", { "x-api-key": LOCAL_DATA_GOV_KEY })
+    : await fetchJson("/api/nea-rainfall");
   if (payload.code !== 0 || !payload.data?.stations?.length || !payload.data?.readings?.length) {
     throw new Error("Could not load NEA rainfall readings.");
   }
