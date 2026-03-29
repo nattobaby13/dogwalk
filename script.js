@@ -1021,9 +1021,15 @@ async function loadNeaForecast() {
       ? await fetchJsonWithHeaders("https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast", { "x-api-key": LOCAL_DATA_GOV_KEY })
       : await fetchJson("https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast"))
     : await fetchJson("/api/nea-two-hour");
+
+  if (payload?.data?.items?.length) {
+    return payload.data;
+  }
+
   if (payload.code !== 0 || !payload.data?.records?.length) {
     throw new Error("Could not load NEA 2-hour forecast.");
   }
+
   return {
     area_metadata: payload.data.areaMetadata?.map((area) => ({
       name: area?.name,
@@ -1050,9 +1056,15 @@ async function loadNeaDayForecast() {
       ? await fetchJsonWithHeaders("https://api-open.data.gov.sg/v2/real-time/api/twenty-four-hr-forecast", { "x-api-key": LOCAL_DATA_GOV_KEY })
       : await fetchJson("https://api-open.data.gov.sg/v2/real-time/api/twenty-four-hr-forecast"))
     : await fetchJson("/api/nea-two-hour?mode=day");
+
+  if (payload?.items?.length) {
+    return payload.items[0];
+  }
+
   if (payload.code !== 0 || !payload.data?.records?.length) {
     return null;
   }
+
   return payload.data.records[0];
 }
 
