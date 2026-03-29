@@ -1,5 +1,6 @@
 module.exports = async (req, res) => {
   const apiKey = process.env.DATA_GOV_SG_API_KEY;
+  const mode = req.query.mode;
 
   if (!apiKey) {
     res.statusCode = 500;
@@ -9,7 +10,10 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const response = await fetch("https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast", {
+    const upstreamUrl = mode === "day"
+      ? "https://api-open.data.gov.sg/v2/real-time/api/twenty-four-hr-forecast"
+      : "https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast";
+    const response = await fetch(upstreamUrl, {
       headers: {
         "x-api-key": apiKey
       }

@@ -15,7 +15,7 @@ For Vercel:
    - `/api/stations`
    - `/api/station?uid=...`
    - `/api/nea-two-hour`
-   - `/api/nea-day`
+   - `/api/nea-two-hour?mode=day`
    - `/api/nea-rainfall`
 
 ## Data sources
