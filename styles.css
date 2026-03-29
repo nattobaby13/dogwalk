@@ -333,53 +333,6 @@ h3 {
   padding: 16px;
 }
 
-.compare-diagram {
-  display: grid;
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.compare-row {
-  display: grid;
-  grid-template-columns: 130px minmax(0, 1fr) 92px;
-  gap: 12px;
-  align-items: center;
-}
-
-.compare-label {
-  color: var(--muted);
-  font-size: 0.9rem;
-  line-height: 1.35;
-}
-
-.compare-bar-track {
-  position: relative;
-  height: 12px;
-  border-radius: 999px;
-  background: rgba(120, 130, 150, 0.14);
-  overflow: hidden;
-}
-
-.compare-bar-fill {
-  height: 100%;
-  border-radius: inherit;
-}
-
-.compare-bar-fill.aqicn {
-  background: linear-gradient(90deg, #7fbf7a 0%, #d1a46a 68%, #d57f6e 100%);
-}
-
-.compare-bar-fill.nea {
-  background: linear-gradient(90deg, #87a8df 0%, #7ec6c0 100%);
-}
-
-.compare-value {
-  text-align: right;
-  font-size: 0.95rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
 .station-list {
   display: grid;
   gap: 8px;
@@ -1008,15 +961,6 @@ h3 {
   .rain-icon {
     width: 18px;
     height: 18px;
-  }
-
-  .compare-row {
-    grid-template-columns: 1fr;
-    gap: 6px;
-  }
-
-  .compare-value {
-    text-align: left;
   }
 
   .dog-frame {

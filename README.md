@@ -4,7 +4,7 @@ Pawcaster is a Singapore dog-walk dashboard designed for an always-on iPad displ
 
 It combines:
 - AQICN / WAQI air-quality data
-- NEA / data.gov.sg weather, rainfall, PM2.5, and WBGT data
+- NEA / data.gov.sg weather, rainfall, and WBGT data
 - a simple walk recommendation model
 
 The main question it answers is:
@@ -20,7 +20,6 @@ The main question it answers is:
 - 2-hour NEA weather forecast
 - 24-hour NEA regional forecast
 - Ground wetness estimate from nearby rainfall readings
-- PM2.5 comparison between AQICN station data and data.gov regional data
 - A walk recommendation:
   - `Walk is good`
   - `Keep it short`
@@ -49,7 +48,6 @@ Hosting:
 - [api/nea-two-hour.js](C:\Users\GeraldineQuekCaiTing\Documents\New%20project\api\nea-two-hour.js): NEA 2-hour forecast and 24-hour forecast proxy
 - [api/nea-rainfall.js](C:\Users\GeraldineQuekCaiTing\Documents\New%20project\api\nea-rainfall.js): NEA rainfall proxy
 - [api/nea-wbgt.js](C:\Users\GeraldineQuekCaiTing\Documents\New%20project\api\nea-wbgt.js): NEA WBGT proxy
-- [api/nea-pm25.js](C:\Users\GeraldineQuekCaiTing\Documents\New%20project\api\nea-pm25.js): NEA PM2.5 proxy
 - [site.webmanifest](C:\Users\GeraldineQuekCaiTing\Documents\New%20project\site.webmanifest): installed web-app metadata
 - [assets/](C:\Users\GeraldineQuekCaiTing\Documents\New%20project\assets): app icon assets
 
@@ -64,7 +62,6 @@ Used for:
 - humidity
 - station timestamp
 - dominant pollutant
-- raw station PM2.5 when available
 
 Frontend routes:
 - `/api/stations`
@@ -77,14 +74,12 @@ Used for:
 - 24-hour forecast
 - rainfall readings
 - WBGT readings
-- regional PM2.5
 
 Frontend routes:
 - `/api/nea-two-hour`
 - `/api/nea-two-hour?mode=day`
 - `/api/nea-rainfall`
 - `/api/nea-wbgt`
-- `/api/nea-pm25`
 
 ## Walk decision logic
 
@@ -142,19 +137,6 @@ then the verdict becomes:
 - `Humidity stop`
 - `Rain stop`
 
-## PM2.5 comparison card
-
-The PM2.5 comparison card is meant to compare:
-- AQICN station PM2.5
-- data.gov regional PM2.5
-
-It also shows an estimated AQI conversion on each side to make the values easier to compare visually.
-
-Important:
-- AQICN main `AQI` is an index, not raw PM2.5
-- the comparison card should use raw PM2.5 where available
-- data.gov PM2.5 is regional, not station-level
-
 ## Ground wetness
 
 Ground wetness is inferred from:
@@ -176,7 +158,6 @@ If one of these fails, Pawcaster should continue rendering the rest:
 - 24-hour forecast
 - rainfall
 - WBGT
-- PM2.5 comparison
 
 Unavailable sections should degrade gracefully instead of crashing the app.
 

@@ -44,8 +44,6 @@ const els = {
   scoreValue: document.getElementById("scoreValue"),
   scoreCaption: document.getElementById("scoreCaption"),
   dominantPollutant: document.getElementById("dominantPollutant"),
-  pm25Summary: document.getElementById("pm25Summary"),
-  pm25CompareDiagram: document.getElementById("pm25CompareDiagram"),
   rainSummary: document.getElementById("rainSummary"),
   rainTimeline: document.getElementById("rainTimeline"),
   dayForecastSummary: document.getElementById("dayForecastSummary"),
@@ -81,10 +79,6 @@ const EMPTY_RAINFALL = {
 
 const EMPTY_WBGT = {
   records: []
-};
-
-const EMPTY_PM25 = {
-  items: []
 };
 
 function setStatus(message, isError = false) {
@@ -153,6 +147,17 @@ function formatPollutant(value = "") {
   };
 
   return labels[key] || String(value).toUpperCase();
+}
+
+function getDisplayedAqi(detail) {
+  const dominantKey = String(detail?.dominentpol || "").toLowerCase();
+  const dominantAqi = Number(detail?.iaqi?.[dominantKey]?.v);
+  if (Number.isFinite(dominantAqi)) {
+    return dominantAqi;
+  }
+
+  const stationAqi = Number(detail?.aqi);
+  return Number.isFinite(stationAqi) ? stationAqi : NaN;
 }
 
 function formatTemperature(value) {
@@ -582,54 +587,6 @@ function renderLoadingState() {
   els.rainTimeline.innerHTML = "";
   els.dayForecastSummary.textContent = "Loading NEA day forecast...";
   els.dayForecastTimeline.innerHTML = "";
-  els.pm25Summary.textContent = "Loading AQICN and data.gov values...";
-  els.pm25CompareDiagram.innerHTML = "";
-}
-
-function renderPm25Comparison(aqicnPm25, neaPm25, regionName) {
-  const aqicnLabel = Number.isFinite(aqicnPm25) ? formatPm25(aqicnPm25) : "--";
-  const neaLabel = Number.isFinite(neaPm25) ? formatPm25(neaPm25) : "--";
-
-  els.pm25Summary.textContent = regionName
-    ? `AQICN station vs ${regionName} regional PM2.5`
-    : "AQICN station vs regional PM2.5";
-
-  els.pm25CompareDiagram.innerHTML = `
-    <div class="compare-row">
-      <div class="compare-label">AQICN station PM2.5</div>
-      <div class="compare-bar-track">
-        <div class="compare-bar-fill aqicn" style="width:${getCompareBarWidth(aqicnPm25, 60)}%"></div>
-      </div>
-      <div class="compare-value">${aqicnLabel}</div>
-    </div>
-    <div class="compare-row">
-      <div class="compare-label">data.gov PM2.5</div>
-      <div class="compare-bar-track">
-        <div class="compare-bar-fill nea" style="width:${getCompareBarWidth(neaPm25, 60)}%"></div>
-      </div>
-      <div class="compare-value">${neaLabel}</div>
-    </div>
-  `;
-}
-
-function renderUnavailablePm25Comparison() {
-  els.pm25Summary.textContent = "PM2.5 comparison unavailable";
-  els.pm25CompareDiagram.innerHTML = `
-    <div class="compare-row">
-      <div class="compare-label">AQICN station PM2.5</div>
-      <div class="compare-bar-track">
-        <div class="compare-bar-fill aqicn" style="width:4%"></div>
-      </div>
-      <div class="compare-value">--</div>
-    </div>
-    <div class="compare-row">
-      <div class="compare-label">data.gov PM2.5</div>
-      <div class="compare-bar-track">
-        <div class="compare-bar-fill nea" style="width:4%"></div>
-      </div>
-      <div class="compare-value">--</div>
-    </div>
-  `;
 }
 
 function classifyRainText(text = "") {
@@ -938,7 +895,7 @@ function closeStationSheet() {
 }
 
 function renderDetail(detail, rainAdjustment) {
-  const aqi = Number(detail.aqi);
+  const aqi = getDisplayedAqi(detail);
   const temp = Number(detail.iaqi?.t?.v);
   const humidity = Number(detail.iaqi?.h?.v);
   let result = getVerdictDetails(aqi, temp, humidity, rainAdjustment?.wbgtReading);
@@ -1095,24 +1052,12 @@ async function loadWbgtReadings() {
   return payload.data;
 }
 
-async function loadPm25Readings() {
-  const payload = window.location.protocol === "file:"
-    ? await fetchJson(LOCAL_DATA_GOV_KEY
-      ? "https://api-open.data.gov.sg/v2/real-time/api/pm25"
-      : "https://api-open.data.gov.sg/v2/real-time/api/pm25")
-    : await fetchJson("/api/nea-pm25");
-  if (payload.code !== 0 || !payload.data?.items?.length) {
-    throw new Error("Could not load NEA PM2.5 readings.");
-  }
-  return payload.data;
-}
-
 async function enrichStationsWithVerdicts(baseStations, neaForecast, wbgtData) {
   const wbgtReadings = wbgtData?.records?.[0]?.item?.readings || [];
   const details = await Promise.all(baseStations.map(async (station) => {
     try {
       const detail = await loadStationDetail(station.uid);
-      const aqi = Number(detail.aqi);
+      const aqi = getDisplayedAqi(detail);
       const temp = Number(detail.iaqi?.t?.v);
       const humidity = Number(detail.iaqi?.h?.v);
       const coordinates = getCoordinatesFromDetail(detail) || getCoordinatesFromStation(station);
@@ -1146,7 +1091,7 @@ async function enrichStationsWithVerdicts(baseStations, neaForecast, wbgtData) {
   return details;
 }
 
-async function renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallData, wbgtData, pm25Data) {
+async function renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallData, wbgtData) {
   const selectedStation = getSelectedStation();
   const detail = await loadOptional(
     () => loadStationDetail(selectedUid),
@@ -1184,14 +1129,6 @@ async function renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallD
   rainAdjustment.groundLabel = groundLabel;
   rainAdjustment.wbgtReading = wbgtReading;
   renderDetail(detail, rainAdjustment);
-  const pm25Region = getRegionForCoordinates(coordinates);
-  const neaPm25 = Number(pm25Data?.items?.[0]?.readings?.pm25_one_hourly?.[pm25Region]);
-  const aqicnPm25 = Number(detail.iaqi?.pm25?.v);
-  if (Number.isFinite(aqicnPm25) || Number.isFinite(neaPm25)) {
-    renderPm25Comparison(aqicnPm25, neaPm25, `${pm25Region.charAt(0).toUpperCase()}${pm25Region.slice(1)}`);
-  } else {
-    renderUnavailablePm25Comparison();
-  }
   renderRainTimeline(neaForecast, nearestArea.name);
   renderDayForecast(neaDayForecast, dayForecastRegion);
   const forecastUpdated = formatUpdatedLabel(neaForecast.items?.[0]?.update_timestamp, "Forecast");
@@ -1210,14 +1147,12 @@ async function refreshAll() {
     neaForecast,
     neaDayForecast,
     rainfallData,
-    wbgtData,
-    pm25Data
+    wbgtData
   ] = await Promise.all([
     loadOptional(loadNeaForecast, EMPTY_TWO_HOUR_FORECAST),
     loadOptional(loadNeaDayForecast, null),
     loadOptional(loadRainfallReadings, EMPTY_RAINFALL),
-    loadOptional(loadWbgtReadings, EMPTY_WBGT),
-    loadOptional(loadPm25Readings, EMPTY_PM25)
+    loadOptional(loadWbgtReadings, EMPTY_WBGT)
   ]);
   stations = await loadStations();
   if (!stations.length) {
@@ -1231,7 +1166,7 @@ async function refreshAll() {
 
   stations = await enrichStationsWithVerdicts(stations, neaForecast || EMPTY_TWO_HOUR_FORECAST, wbgtData);
   renderStations();
-  await renderSelectedStationPanel(neaForecast || EMPTY_TWO_HOUR_FORECAST, neaDayForecast, rainfallData, wbgtData, pm25Data);
+  await renderSelectedStationPanel(neaForecast || EMPTY_TWO_HOUR_FORECAST, neaDayForecast, rainfallData, wbgtData);
   setStatus("Auto-refreshes every 10 min");
 }
 
@@ -1246,17 +1181,15 @@ async function refreshSelectedStation() {
     neaForecast,
     neaDayForecast,
     rainfallData,
-    wbgtData,
-    pm25Data
+    wbgtData
   ] = await Promise.all([
     loadOptional(loadNeaForecast, EMPTY_TWO_HOUR_FORECAST),
     loadOptional(loadNeaDayForecast, null),
     loadOptional(loadRainfallReadings, EMPTY_RAINFALL),
-    loadOptional(loadWbgtReadings, EMPTY_WBGT),
-    loadOptional(loadPm25Readings, EMPTY_PM25)
+    loadOptional(loadWbgtReadings, EMPTY_WBGT)
   ]);
   renderStations();
-  await renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallData, wbgtData, pm25Data);
+  await renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallData, wbgtData);
   setStatus("Auto-refreshes every 10 min");
 }
 
