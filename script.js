@@ -86,6 +86,12 @@ function setStatus(message, isError = false) {
   els.statusMessage.style.color = isError ? "var(--skip)" : "";
 }
 
+function setTextIfPresent(element, value) {
+  if (element) {
+    element.textContent = value;
+  }
+}
+
 async function loadOptional(loader, fallback) {
   try {
     return await loader();
@@ -582,7 +588,7 @@ function renderLoadingState() {
   els.rainNowIcon.setAttribute("aria-label", "Loading weather");
   els.groundValue.textContent = "--";
   renderScore("--", "Loading score breakdown");
-  els.dominantPollutant.textContent = "Dominant pollutant unavailable";
+  setTextIfPresent(els.dominantPollutant, "Dominant pollutant unavailable");
   els.rainSummary.textContent = "Loading NEA forecast...";
   els.rainTimeline.innerHTML = "";
   els.dayForecastSummary.textContent = "Loading NEA day forecast...";
@@ -935,9 +941,12 @@ function renderDetail(detail, rainAdjustment) {
   els.groundValue.textContent = rainAdjustment?.groundLabel || "--";
   renderScore(scoreText, scoreCaption);
   const dominantPollutant = formatPollutant(detail.dominentpol || "");
-  els.dominantPollutant.textContent = detail.dominentpol
-    ? `AQICN dominant pollutant: ${dominantPollutant}`
-    : "Dominant pollutant unavailable";
+  setTextIfPresent(
+    els.dominantPollutant,
+    detail.dominentpol
+      ? `AQICN dominant pollutant: ${dominantPollutant}`
+      : "Dominant pollutant unavailable"
+  );
   els.aqiUpdated.textContent = formatUpdatedLabel(detail.time?.iso, "AQICN updated");
 }
 
