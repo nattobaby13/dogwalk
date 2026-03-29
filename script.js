@@ -548,8 +548,8 @@ function renderDayForecast(record, region) {
   els.dayForecastTimeline.innerHTML = periods.map((period) => {
     const forecast = period.regions?.[region] || period.regions?.central || { text: "Forecast unavailable" };
     const state = classifyRainText(forecast.text || "");
-    const startLabel = formatSingleTimeLabel(period.timePeriod?.start);
-    const endLabel = formatSingleTimeLabel(period.timePeriod?.end);
+    const startLabel = formatSingleTimeLabel(period.time?.start);
+    const endLabel = formatSingleTimeLabel(period.time?.end);
 
     return `
       <article class="rain-block ${state.key}">
@@ -679,13 +679,13 @@ async function loadNeaForecast() {
 }
 
 async function loadNeaDayForecast() {
-  const payload = window.location.protocol === "file:" && LOCAL_DATA_GOV_KEY
-    ? await fetchJsonWithHeaders("https://api-open.data.gov.sg/v2/real-time/api/twenty-four-hr-forecast", { "x-api-key": LOCAL_DATA_GOV_KEY })
+  const payload = window.location.protocol === "file:"
+    ? await fetchJson("https://api.data.gov.sg/v1/environment/24-hour-weather-forecast")
     : await fetchJson("/api/nea-two-hour?mode=day");
-  if (payload.code !== 0 || !payload.data?.records?.length) {
-    throw new Error("Could not load NEA 24-hour forecast.");
+  if (!payload.items?.length) {
+    return null;
   }
-  return payload.data.records[0];
+  return payload.items[0];
 }
 
 async function loadRainfallReadings() {
@@ -757,7 +757,9 @@ async function renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallD
   renderDayForecast(neaDayForecast, dayForecastRegion);
   const forecastUpdated = formatUpdatedLabel(neaForecast.items?.[0]?.update_timestamp, "Forecast");
   const rainfallUpdated = formatUpdatedLabel(latestRainReading?.timestamp, "Rainfall");
-  const dayForecastUpdated = formatUpdatedLabel(neaDayForecast.updatedTimestamp, "24h");
+  const dayForecastUpdated = neaDayForecast?.update_timestamp
+    ? formatUpdatedLabel(neaDayForecast.update_timestamp, "24h")
+    : "24h unavailable";
   els.rainUpdated.textContent = `${forecastUpdated} | ${dayForecastUpdated} | ${rainfallUpdated}`;
 }
 
