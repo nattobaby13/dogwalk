@@ -40,10 +40,11 @@ const els = {
   humidityValue: document.getElementById("humidityValue"),
   wbgtValue: document.getElementById("wbgtValue"),
   rainNowIcon: document.getElementById("rainNowIcon"),
-  rainNowValue: document.getElementById("rainNowValue"),
   groundValue: document.getElementById("groundValue"),
   scoreValue: document.getElementById("scoreValue"),
   scoreCaption: document.getElementById("scoreCaption"),
+  pm25Summary: document.getElementById("pm25Summary"),
+  pm25CompareDiagram: document.getElementById("pm25CompareDiagram"),
   rainSummary: document.getElementById("rainSummary"),
   rainTimeline: document.getElementById("rainTimeline"),
   dayForecastSummary: document.getElementById("dayForecastSummary"),
@@ -67,9 +68,48 @@ function getSelectedStation() {
   return stations.find((station) => Number(station.uid) === Number(selectedUid)) || null;
 }
 
+const EMPTY_TWO_HOUR_FORECAST = {
+  area_metadata: [],
+  items: []
+};
+
+const EMPTY_RAINFALL = {
+  stations: [],
+  readings: []
+};
+
+const EMPTY_WBGT = {
+  records: []
+};
+
+const EMPTY_PM25 = {
+  items: []
+};
+
 function setStatus(message, isError = false) {
   els.statusMessage.textContent = message;
   els.statusMessage.style.color = isError ? "var(--skip)" : "";
+}
+
+async function loadOptional(loader, fallback) {
+  try {
+    return await loader();
+  } catch {
+    return fallback;
+  }
+}
+
+function createFallbackDetail(station) {
+  const coordinates = getCoordinatesFromStation(station);
+  return {
+    aqi: Number(station?.aqi),
+    city: {
+      name: station?.name || "Selected station",
+      geo: coordinates ? [coordinates.lat, coordinates.lon] : null
+    },
+    iaqi: {},
+    time: null
+  };
 }
 
 async function fetchJson(url) {
@@ -124,6 +164,10 @@ function formatHumidity(value) {
 
 function formatWbgt(value) {
   return Number.isFinite(value) ? `${value.toFixed(1)} C` : "--";
+}
+
+function formatPm25(value) {
+  return Number.isFinite(value) ? `${Math.round(value)} ug/m3` : "--";
 }
 
 function formatRelativeMinutes(isoString) {
@@ -310,6 +354,37 @@ function getWbgtPenalty(heatStress) {
   return null;
 }
 
+function convertPm25ToAqi(value) {
+  if (!Number.isFinite(value) || value < 0) {
+    return null;
+  }
+
+  const breakpoints = [
+    { cLow: 0.0, cHigh: 9.0, aqiLow: 0, aqiHigh: 50 },
+    { cLow: 9.1, cHigh: 35.4, aqiLow: 51, aqiHigh: 100 },
+    { cLow: 35.5, cHigh: 55.4, aqiLow: 101, aqiHigh: 150 },
+    { cLow: 55.5, cHigh: 125.4, aqiLow: 151, aqiHigh: 200 },
+    { cLow: 125.5, cHigh: 225.4, aqiLow: 201, aqiHigh: 300 },
+    { cLow: 225.5, cHigh: 325.4, aqiLow: 301, aqiHigh: 400 },
+    { cLow: 325.5, cHigh: 500.4, aqiLow: 401, aqiHigh: 500 }
+  ];
+
+  const band = breakpoints.find((entry) => value >= entry.cLow && value <= entry.cHigh);
+  if (!band) {
+    return value > 500.4 ? 500 : null;
+  }
+
+  const aqi = ((band.aqiHigh - band.aqiLow) / (band.cHigh - band.cLow)) * (value - band.cLow) + band.aqiLow;
+  return Math.round(aqi);
+}
+
+function getCompareBarWidth(value, max = 200) {
+  if (!Number.isFinite(value) || max <= 0) {
+    return 0;
+  }
+  return Math.max(4, Math.min(100, (value / max) * 100));
+}
+
 function getVerdictDetails(aqi, temp, humidity, wbgtReading) {
   const wbgtValue = Number(wbgtReading?.wbgt);
   const wbgtHeatStress = String(wbgtReading?.heatStress || "").toLowerCase();
@@ -442,6 +517,55 @@ function renderScore(scoreText, scoreCaption) {
   els.scoreCaption.textContent = scoreCaption;
 }
 
+function renderPm25Comparison(aqicnAqi, neaPm25, regionName) {
+  const estimatedAqi = convertPm25ToAqi(neaPm25);
+  const aqicnLabel = Number.isFinite(aqicnAqi) ? `AQI ${aqicnAqi}` : "--";
+  const neaLabel = Number.isFinite(neaPm25)
+    ? `${formatPm25(neaPm25)}${Number.isFinite(estimatedAqi) ? ` -> est. AQI ${estimatedAqi}` : ""}`
+    : "--";
+
+  els.pm25Summary.textContent = regionName
+    ? `AQICN station vs ${regionName} regional PM2.5`
+    : "AQICN station vs regional PM2.5";
+
+  els.pm25CompareDiagram.innerHTML = `
+    <div class="compare-row">
+      <div class="compare-label">AQICN station AQI</div>
+      <div class="compare-bar-track">
+        <div class="compare-bar-fill aqicn" style="width:${getCompareBarWidth(aqicnAqi, 300)}%"></div>
+      </div>
+      <div class="compare-value">${aqicnLabel}</div>
+    </div>
+    <div class="compare-row">
+      <div class="compare-label">data.gov PM2.5</div>
+      <div class="compare-bar-track">
+        <div class="compare-bar-fill nea" style="width:${getCompareBarWidth(estimatedAqi, 300)}%"></div>
+      </div>
+      <div class="compare-value">${neaLabel}</div>
+    </div>
+  `;
+}
+
+function renderUnavailablePm25Comparison() {
+  els.pm25Summary.textContent = "PM2.5 comparison unavailable";
+  els.pm25CompareDiagram.innerHTML = `
+    <div class="compare-row">
+      <div class="compare-label">AQICN station AQI</div>
+      <div class="compare-bar-track">
+        <div class="compare-bar-fill aqicn" style="width:4%"></div>
+      </div>
+      <div class="compare-value">--</div>
+    </div>
+    <div class="compare-row">
+      <div class="compare-label">data.gov PM2.5</div>
+      <div class="compare-bar-track">
+        <div class="compare-bar-fill nea" style="width:4%"></div>
+      </div>
+      <div class="compare-value">--</div>
+    </div>
+  `;
+}
+
 function classifyRainText(text = "") {
   const lower = text.toLowerCase();
   if (lower.includes("thundery") || lower.includes("showers") || lower.includes("rain")) {
@@ -463,6 +587,24 @@ function normalizeDayForecastText(value) {
   }
 
   return "";
+}
+
+function getSingaporeDateParts(isoString) {
+  const date = new Date(isoString);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Singapore",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false
+  }).formatToParts(date);
+
+  const lookup = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return {
+    dateKey: `${lookup.year}-${lookup.month}-${lookup.day}`,
+    hour: Number(lookup.hour)
+  };
 }
 
 function getRainIconMarkup(text = "") {
@@ -627,16 +769,53 @@ function renderDayForecast(record, region) {
 
   const regionLabel = `${region.charAt(0).toUpperCase()}${region.slice(1)} region`;
   els.dayForecastSummary.textContent = regionLabel;
-  els.dayForecastTimeline.innerHTML = periods.map((period) => {
+  const forecastDateKey = record?.valid_period?.start
+    ? getSingaporeDateParts(record.valid_period.start).dateKey
+    : getSingaporeDateParts(periods[0].time.start).dateKey;
+
+  const bucketMap = {
+    Morning: null,
+    Afternoon: null,
+    Night: null
+  };
+
+  for (const period of periods) {
+    const startParts = getSingaporeDateParts(period.time?.start);
+    const endParts = getSingaporeDateParts(period.time?.end);
+
+    if (startParts.dateKey === forecastDateKey && startParts.hour === 6 && endParts.hour === 12) {
+      bucketMap.Morning = period;
+    }
+
+    if (startParts.dateKey === forecastDateKey && startParts.hour === 12 && endParts.hour === 18) {
+      bucketMap.Afternoon = period;
+    }
+
+    if (startParts.dateKey === forecastDateKey && startParts.hour === 18) {
+      bucketMap.Night = period;
+    }
+  }
+
+  if (!bucketMap.Night) {
+    bucketMap.Night = periods.find((period) => {
+      const startParts = getSingaporeDateParts(period.time?.start);
+      const endParts = getSingaporeDateParts(period.time?.end);
+      return startParts.dateKey === forecastDateKey && startParts.hour === 0 && endParts.hour === 6;
+    }) || null;
+  }
+
+  const orderedBuckets = ["Morning", "Afternoon", "Night"]
+    .map((label) => [label, bucketMap[label]])
+    .filter(([, period]) => period);
+
+  els.dayForecastTimeline.innerHTML = orderedBuckets.map(([bucketLabel, period]) => {
     const forecastText = normalizeDayForecastText(period.regions?.[region] || period.regions?.central);
     const state = classifyRainText(forecastText);
-    const startLabel = formatSingleTimeLabel(period.time?.start);
-    const endLabel = formatSingleTimeLabel(period.time?.end);
 
     return `
       <article class="rain-block ${state.key}">
         <div class="rain-header">
-          <p class="rain-time">${startLabel} to ${endLabel}</p>
+          <p class="rain-time">${bucketLabel}</p>
           ${getRainIconMarkup(forecastText)}
         </div>
         <p class="rain-label">${state.label}</p>
@@ -711,7 +890,6 @@ function renderDetail(detail, rainAdjustment) {
   els.humidityValue.textContent = formatHumidity(humidity);
   els.wbgtValue.textContent = formatWbgt(Number(rainAdjustment?.wbgtReading?.wbgt));
   els.rainNowIcon.innerHTML = getRainIconMarkup(rainAdjustment?.metricLabel || "");
-  els.rainNowValue.textContent = rainAdjustment?.metricLabel || "--";
   els.groundValue.textContent = rainAdjustment?.groundLabel || "--";
   renderScore(scoreText, scoreCaption);
   els.aqiUpdated.textContent = formatUpdatedLabel(detail.time?.iso, "AQICN updated");
@@ -752,8 +930,10 @@ async function loadStationDetail(uid) {
 }
 
 async function loadNeaForecast() {
-  const payload = window.location.protocol === "file:" && LOCAL_DATA_GOV_KEY
-    ? await fetchJsonWithHeaders("https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast", { "x-api-key": LOCAL_DATA_GOV_KEY })
+  const payload = window.location.protocol === "file:"
+    ? (LOCAL_DATA_GOV_KEY
+      ? await fetchJsonWithHeaders("https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast", { "x-api-key": LOCAL_DATA_GOV_KEY })
+      : await fetchJson("https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast"))
     : await fetchJson("/api/nea-two-hour");
   if (payload.code !== 0 || !payload.data?.items?.length) {
     throw new Error("Could not load NEA 2-hour forecast.");
@@ -772,8 +952,10 @@ async function loadNeaDayForecast() {
 }
 
 async function loadRainfallReadings() {
-  const payload = window.location.protocol === "file:" && LOCAL_DATA_GOV_KEY
-    ? await fetchJsonWithHeaders("https://api-open.data.gov.sg/v2/real-time/api/rainfall", { "x-api-key": LOCAL_DATA_GOV_KEY })
+  const payload = window.location.protocol === "file:"
+    ? (LOCAL_DATA_GOV_KEY
+      ? await fetchJsonWithHeaders("https://api-open.data.gov.sg/v2/real-time/api/rainfall", { "x-api-key": LOCAL_DATA_GOV_KEY })
+      : await fetchJson("https://api-open.data.gov.sg/v2/real-time/api/rainfall"))
     : await fetchJson("/api/nea-rainfall");
   if (payload.code !== 0 || !payload.data?.stations?.length || !payload.data?.readings?.length) {
     throw new Error("Could not load NEA rainfall readings.");
@@ -783,10 +965,24 @@ async function loadRainfallReadings() {
 
 async function loadWbgtReadings() {
   const payload = window.location.protocol === "file:"
-    ? await fetchJson("https://api-open.data.gov.sg/v2/real-time/api/weather?api=wbgt")
+    ? await fetchJson(LOCAL_DATA_GOV_KEY
+      ? "https://api-open.data.gov.sg/v2/real-time/api/weather?api=wbgt"
+      : "https://api-open.data.gov.sg/v2/real-time/api/weather?api=wbgt")
     : await fetchJson("/api/nea-wbgt");
   if (payload.code !== 0 || !payload.data?.records?.length) {
     throw new Error("Could not load NEA WBGT observations.");
+  }
+  return payload.data;
+}
+
+async function loadPm25Readings() {
+  const payload = window.location.protocol === "file:"
+    ? await fetchJson(LOCAL_DATA_GOV_KEY
+      ? "https://api-open.data.gov.sg/v2/real-time/api/pm25"
+      : "https://api-open.data.gov.sg/v2/real-time/api/pm25")
+    : await fetchJson("/api/nea-pm25");
+  if (payload.code !== 0 || !payload.data?.items?.length) {
+    throw new Error("Could not load NEA PM2.5 readings.");
   }
   return payload.data;
 }
@@ -830,11 +1026,15 @@ async function enrichStationsWithVerdicts(baseStations, neaForecast, wbgtData) {
   return details;
 }
 
-async function renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallData, wbgtData) {
-  const detail = await loadStationDetail(selectedUid);
-  const fallbackCoordinates = getCoordinatesFromStation(getSelectedStation());
+async function renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallData, wbgtData, pm25Data) {
+  const selectedStation = getSelectedStation();
+  const detail = await loadOptional(
+    () => loadStationDetail(selectedUid),
+    createFallbackDetail(selectedStation)
+  );
+  const fallbackCoordinates = getCoordinatesFromStation(selectedStation);
   const coordinates = getCoordinatesFromDetail(detail) || fallbackCoordinates;
-  const nearestArea = getNearestForecastArea(coordinates, neaForecast.area_metadata) || { name: "Unknown area" };
+  const nearestArea = getNearestForecastArea(coordinates, neaForecast?.area_metadata) || { name: "Unknown area" };
   const dayForecastRegion = getRegionForCoordinates(coordinates);
   const currentForecast = getForecastForArea(neaForecast, nearestArea.name)?.forecast || "";
   const rainAdjustment = getRainAdjustmentFromForecast(currentForecast);
@@ -848,13 +1048,13 @@ async function renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallD
   );
   const nearestRainStation = getNearestPoint(
     coordinates,
-    rainfallData.stations,
+    rainfallData?.stations || [],
     (station) => ({
       lat: Number(station?.location?.latitude),
       lon: Number(station?.location?.longitude)
     })
   );
-  const latestRainReading = rainfallData.readings?.[0];
+  const latestRainReading = rainfallData?.readings?.[0];
   const rainStationReading = latestRainReading?.data?.find((entry) => entry.stationId === nearestRainStation?.id);
   const groundLabel = evaluateGroundWetness(
     nearestRainStation?.id,
@@ -864,6 +1064,13 @@ async function renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallD
   rainAdjustment.groundLabel = groundLabel;
   rainAdjustment.wbgtReading = wbgtReading;
   renderDetail(detail, rainAdjustment);
+  const pm25Region = getRegionForCoordinates(coordinates);
+  const neaPm25 = Number(pm25Data?.items?.[0]?.readings?.pm25_one_hourly?.[pm25Region]);
+  if (Number.isFinite(Number(detail.aqi)) || Number.isFinite(neaPm25)) {
+    renderPm25Comparison(Number(detail.aqi), neaPm25, `${pm25Region.charAt(0).toUpperCase()}${pm25Region.slice(1)}`);
+  } else {
+    renderUnavailablePm25Comparison();
+  }
   renderRainTimeline(neaForecast, nearestArea.name);
   renderDayForecast(neaDayForecast, dayForecastRegion);
   const forecastUpdated = formatUpdatedLabel(neaForecast.items?.[0]?.update_timestamp, "Forecast");
@@ -878,10 +1085,19 @@ async function renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallD
 async function refreshAll() {
   setStatus("Loading latest reported station data...");
 
-  const neaForecast = await loadNeaForecast();
-  const neaDayForecast = await loadNeaDayForecast();
-  const rainfallData = await loadRainfallReadings();
-  const wbgtData = await loadWbgtReadings();
+  const [
+    neaForecast,
+    neaDayForecast,
+    rainfallData,
+    wbgtData,
+    pm25Data
+  ] = await Promise.all([
+    loadOptional(loadNeaForecast, EMPTY_TWO_HOUR_FORECAST),
+    loadOptional(loadNeaDayForecast, null),
+    loadOptional(loadRainfallReadings, EMPTY_RAINFALL),
+    loadOptional(loadWbgtReadings, EMPTY_WBGT),
+    loadOptional(loadPm25Readings, EMPTY_PM25)
+  ]);
   stations = await loadStations();
   if (!stations.length) {
     throw new Error("No Singapore stations available.");
@@ -892,9 +1108,9 @@ async function refreshAll() {
     persistSelectedUid(stations[0].uid);
   }
 
-  stations = await enrichStationsWithVerdicts(stations, neaForecast, wbgtData);
+  stations = await enrichStationsWithVerdicts(stations, neaForecast || EMPTY_TWO_HOUR_FORECAST, wbgtData);
   renderStations();
-  await renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallData, wbgtData);
+  await renderSelectedStationPanel(neaForecast || EMPTY_TWO_HOUR_FORECAST, neaDayForecast, rainfallData, wbgtData, pm25Data);
   setStatus("Auto-refreshes every 10 min");
 }
 
@@ -904,12 +1120,21 @@ async function refreshSelectedStation() {
   }
 
   setStatus("Updating station...");
-  const neaForecast = await loadNeaForecast();
-  const neaDayForecast = await loadNeaDayForecast();
-  const rainfallData = await loadRainfallReadings();
-  const wbgtData = await loadWbgtReadings();
+  const [
+    neaForecast,
+    neaDayForecast,
+    rainfallData,
+    wbgtData,
+    pm25Data
+  ] = await Promise.all([
+    loadOptional(loadNeaForecast, EMPTY_TWO_HOUR_FORECAST),
+    loadOptional(loadNeaDayForecast, null),
+    loadOptional(loadRainfallReadings, EMPTY_RAINFALL),
+    loadOptional(loadWbgtReadings, EMPTY_WBGT),
+    loadOptional(loadPm25Readings, EMPTY_PM25)
+  ]);
   renderStations();
-  await renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallData, wbgtData);
+  await renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallData, wbgtData, pm25Data);
   setStatus("Auto-refreshes every 10 min");
 }
 

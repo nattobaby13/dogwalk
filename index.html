@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260329c">
+  <link rel="stylesheet" href="styles.css?v=20260329d">
 </head>
 <body>
   <main class="screen">
@@ -68,7 +68,7 @@
             <strong id="aqiValue">--</strong>
           </article>
           <article class="metric-card">
-            <p class="metric-label">Temperature</p>
+            <p class="metric-label">TEMP</p>
             <strong id="tempValue">--</strong>
           </article>
           <article class="metric-card">
@@ -83,7 +83,6 @@
             <p class="metric-label">Weather</p>
             <div class="metric-weather">
               <span id="rainNowIcon" aria-hidden="true"></span>
-              <strong id="rainNowValue">--</strong>
             </div>
           </article>
           <article class="metric-card">
@@ -127,6 +126,14 @@
           </div>
           <div class="rain-timeline" id="dayForecastTimeline"></div>
         </section>
+
+        <section class="explain-card compare-card">
+          <div class="section-head">
+            <p class="section-label">PM2.5 Comparison</p>
+            <p class="subtle" id="pm25Summary">Loading AQICN and data.gov values...</p>
+          </div>
+          <div class="compare-diagram" id="pm25CompareDiagram"></div>
+        </section>
       </article>
 
       <aside class="side-column">
@@ -150,6 +157,10 @@
               <p class="source-title">AQI / Temperature / Humidity</p>
               <p class="source-text">AQICN / World Air Quality Index Project and originating agencies.</p>
               <p class="source-updated" id="aqiUpdated">Updated time unavailable</p>
+            </div>
+            <div class="source-item">
+              <p class="source-title">PM2.5 comparison</p>
+              <p class="source-text">data.gov.sg PM2.5 is a regional raw concentration in micrograms per cubic meter. Pawcaster estimates a PM2.5 AQI from that value for comparison only.</p>
             </div>
             <div class="source-item">
               <p class="source-title">Weather / WBGT / Rain</p>
@@ -187,7 +198,7 @@
   <script>
     (function bootApp() {
       const appScript = document.createElement("script");
-      appScript.src = "script.js?v=20260329e";
+      appScript.src = "script.js?v=20260329f";
 
       if (window.location.protocol === "file:") {
         const localConfigScript = document.createElement("script");
