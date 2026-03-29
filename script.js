@@ -4,6 +4,7 @@ const RAIN_HISTORY_KEY = "dog-walk-rain-history-v1";
 const RAIN_HISTORY_WINDOW_MS = 2 * 60 * 60 * 1000;
 const LOCAL_TOKEN = window.WAQI_LOCAL_TOKEN || null;
 const LOCAL_DATA_GOV_KEY = window.DATA_GOV_SG_API_KEY || null;
+const EAST_AQICN_UID = 538438;
 
 const verdictMap = {
   walk: {
@@ -344,6 +345,13 @@ function getRegionForCoordinates(coordinates) {
   if (coordinates.lat >= 1.39) return "north";
   if (coordinates.lat <= 1.27) return "south";
   return "central";
+}
+
+function getAqiSourceUid({ coordinates, uid }) {
+  if (getRegionForCoordinates(coordinates) === "east") {
+    return String(EAST_AQICN_UID);
+  }
+  return String(uid);
 }
 
 function getAqiPenalty(aqi) {
@@ -1065,7 +1073,11 @@ async function enrichStationsWithVerdicts(baseStations, neaForecast, wbgtData) {
   const wbgtReadings = wbgtData?.records?.[0]?.item?.readings || [];
   const details = await Promise.all(baseStations.map(async (station) => {
     try {
-      const detail = await loadStationDetail(station.uid);
+      const sourceUid = getAqiSourceUid({
+        coordinates: getCoordinatesFromStation(station),
+        uid: station.uid
+      });
+      const detail = await loadStationDetail(sourceUid);
       const aqi = getDisplayedAqi(detail);
       const temp = Number(detail.iaqi?.t?.v);
       const humidity = Number(detail.iaqi?.h?.v);
@@ -1102,11 +1114,16 @@ async function enrichStationsWithVerdicts(baseStations, neaForecast, wbgtData) {
 
 async function renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallData, wbgtData) {
   const selectedStation = getSelectedStation();
+  const selectedCoordinates = getCoordinatesFromStation(selectedStation);
+  const sourceUid = getAqiSourceUid({
+    coordinates: selectedCoordinates,
+    uid: selectedUid
+  });
   const detail = await loadOptional(
-    () => loadStationDetail(selectedUid),
+    () => loadStationDetail(sourceUid),
     createFallbackDetail(selectedStation)
   );
-  const fallbackCoordinates = getCoordinatesFromStation(selectedStation);
+  const fallbackCoordinates = selectedCoordinates;
   const coordinates = getCoordinatesFromDetail(detail) || fallbackCoordinates;
   const nearestArea = getNearestForecastArea(coordinates, neaForecast?.area_metadata) || { name: "Unknown area" };
   const dayForecastRegion = getRegionForCoordinates(coordinates);
