@@ -681,7 +681,7 @@ async function loadNeaForecast() {
 async function loadNeaDayForecast() {
   const payload = window.location.protocol === "file:" && LOCAL_DATA_GOV_KEY
     ? await fetchJsonWithHeaders("https://api-open.data.gov.sg/v2/real-time/api/twenty-four-hr-forecast", { "x-api-key": LOCAL_DATA_GOV_KEY })
-    : await fetchJson("/api/nea-twenty-four-hour");
+    : await fetchJson("/api/nea-day");
   if (payload.code !== 0 || !payload.data?.records?.length) {
     throw new Error("Could not load NEA 24-hour forecast.");
   }
