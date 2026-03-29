@@ -119,6 +119,31 @@ h1 {
   line-height: 1.4;
 }
 
+.clock-pill {
+  min-width: 170px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+  text-align: right;
+}
+
+.clock-label {
+  display: block;
+  color: var(--soft);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.66rem;
+}
+
+.clock-pill strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1rem;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+
 .topbar-link {
   max-width: 280px;
   text-align: center;
@@ -739,6 +764,12 @@ h3 {
   .status-pill {
     max-width: none;
     width: 100%;
+  }
+
+  .clock-pill {
+    width: 100%;
+    min-width: 0;
+    text-align: left;
   }
 
   .dashboard {

@@ -55,6 +55,7 @@ const els = {
   stationSheetList: document.getElementById("stationSheetList"),
   stationSheetBackdrop: document.getElementById("stationSheetBackdrop"),
   stationSheetClose: document.getElementById("stationSheetClose"),
+  currentClock: document.getElementById("currentClock"),
   stationList: document.getElementById("stationList")
 };
 
@@ -171,6 +172,16 @@ function formatSingleTimeLabel(isoString) {
     timeZone: "Asia/Singapore",
     hour: "numeric",
     hour12: true
+  });
+}
+
+function renderCurrentClock() {
+  els.currentClock.textContent = new Date().toLocaleTimeString("en-SG", {
+    timeZone: "Asia/Singapore",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
   });
 }
 
@@ -387,6 +398,18 @@ function classifyRainText(text = "") {
   return { key: "dry", label: "Looks dry" };
 }
 
+function normalizeDayForecastText(value) {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (value && typeof value.text === "string") {
+    return value.text;
+  }
+
+  return "";
+}
+
 function getRainIconMarkup(text = "") {
   const lower = text.toLowerCase();
 
@@ -536,7 +559,11 @@ function renderRainTimeline(record, areaName) {
 }
 
 function renderDayForecast(record, region) {
-  const periods = record?.periods || [];
+  const periods = (record?.periods || []).filter((period) => {
+    const start = new Date(period?.time?.start).getTime();
+    const end = new Date(period?.time?.end).getTime();
+    return Number.isFinite(start) && Number.isFinite(end) && end > start;
+  });
   if (!periods.length) {
     els.dayForecastSummary.textContent = "Day forecast unavailable";
     els.dayForecastTimeline.innerHTML = "";
@@ -546,8 +573,8 @@ function renderDayForecast(record, region) {
   const regionLabel = `${region.charAt(0).toUpperCase()}${region.slice(1)} region`;
   els.dayForecastSummary.textContent = regionLabel;
   els.dayForecastTimeline.innerHTML = periods.map((period) => {
-    const forecast = period.regions?.[region] || period.regions?.central || { text: "Forecast unavailable" };
-    const state = classifyRainText(forecast.text || "");
+    const forecastText = normalizeDayForecastText(period.regions?.[region] || period.regions?.central);
+    const state = classifyRainText(forecastText);
     const startLabel = formatSingleTimeLabel(period.time?.start);
     const endLabel = formatSingleTimeLabel(period.time?.end);
 
@@ -555,10 +582,10 @@ function renderDayForecast(record, region) {
       <article class="rain-block ${state.key}">
         <div class="rain-header">
           <p class="rain-time">${startLabel} to ${endLabel}</p>
-          ${getRainIconMarkup(forecast.text || "")}
+          ${getRainIconMarkup(forecastText)}
         </div>
         <p class="rain-label">${state.label}</p>
-        <p class="rain-detail">${forecast.text || "Forecast unavailable"}</p>
+        <p class="rain-detail">${forecastText || "Forecast unavailable"}</p>
       </article>
     `;
   }).join("");
@@ -835,4 +862,6 @@ document.addEventListener("keydown", (event) => {
 });
 
 refresh();
+renderCurrentClock();
+setInterval(renderCurrentClock, 1000);
 setInterval(refresh, REFRESH_INTERVAL_MS);

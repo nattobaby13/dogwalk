@@ -18,6 +18,10 @@
         <p class="brand-subtitle">Air, rain, and ground conditions for dog walks across Singapore.</p>
       </div>
       <div class="topbar-actions">
+        <div class="clock-pill">
+          <span class="clock-label">Singapore time</span>
+          <strong id="currentClock">--:--</strong>
+        </div>
         <div class="status-pill" id="statusMessage">Auto-refreshes every 10 min</div>
       </div>
     </header>
@@ -179,7 +183,7 @@
   <script>
     (function bootApp() {
       const appScript = document.createElement("script");
-      appScript.src = "script.js?v=20260329c";
+      appScript.src = "script.js?v=20260329d";
 
       if (window.location.protocol === "file:") {
         const localConfigScript = document.createElement("script");
