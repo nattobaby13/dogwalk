@@ -43,6 +43,7 @@ const els = {
   groundValue: document.getElementById("groundValue"),
   scoreValue: document.getElementById("scoreValue"),
   scoreCaption: document.getElementById("scoreCaption"),
+  dominantPollutant: document.getElementById("dominantPollutant"),
   pm25Summary: document.getElementById("pm25Summary"),
   pm25CompareDiagram: document.getElementById("pm25CompareDiagram"),
   rainSummary: document.getElementById("rainSummary"),
@@ -576,6 +577,7 @@ function renderLoadingState() {
   els.rainNowIcon.setAttribute("aria-label", "Loading weather");
   els.groundValue.textContent = "--";
   renderScore("--", "Loading score breakdown");
+  els.dominantPollutant.textContent = "Dominant pollutant unavailable";
   els.rainSummary.textContent = "Loading NEA forecast...";
   els.rainTimeline.innerHTML = "";
   els.dayForecastSummary.textContent = "Loading NEA day forecast...";
@@ -584,12 +586,9 @@ function renderLoadingState() {
   els.pm25CompareDiagram.innerHTML = "";
 }
 
-function renderPm25Comparison(aqicnAqi, neaPm25, regionName) {
-  const estimatedAqi = convertPm25ToAqi(neaPm25);
-  const aqicnLabel = Number.isFinite(aqicnAqi) ? `AQI ${aqicnAqi}` : "--";
-  const neaLabel = Number.isFinite(neaPm25)
-    ? `${formatPm25(neaPm25)}${Number.isFinite(estimatedAqi) ? ` -> est. AQI ${estimatedAqi}` : ""}`
-    : "--";
+function renderPm25Comparison(aqicnPm25, neaPm25, regionName) {
+  const aqicnLabel = Number.isFinite(aqicnPm25) ? formatPm25(aqicnPm25) : "--";
+  const neaLabel = Number.isFinite(neaPm25) ? formatPm25(neaPm25) : "--";
 
   els.pm25Summary.textContent = regionName
     ? `AQICN station vs ${regionName} regional PM2.5`
@@ -597,16 +596,16 @@ function renderPm25Comparison(aqicnAqi, neaPm25, regionName) {
 
   els.pm25CompareDiagram.innerHTML = `
     <div class="compare-row">
-      <div class="compare-label">AQICN station AQI</div>
+      <div class="compare-label">AQICN station PM2.5</div>
       <div class="compare-bar-track">
-        <div class="compare-bar-fill aqicn" style="width:${getCompareBarWidth(aqicnAqi, 300)}%"></div>
+        <div class="compare-bar-fill aqicn" style="width:${getCompareBarWidth(aqicnPm25, 60)}%"></div>
       </div>
       <div class="compare-value">${aqicnLabel}</div>
     </div>
     <div class="compare-row">
       <div class="compare-label">data.gov PM2.5</div>
       <div class="compare-bar-track">
-        <div class="compare-bar-fill nea" style="width:${getCompareBarWidth(estimatedAqi, 300)}%"></div>
+        <div class="compare-bar-fill nea" style="width:${getCompareBarWidth(neaPm25, 60)}%"></div>
       </div>
       <div class="compare-value">${neaLabel}</div>
     </div>
@@ -617,7 +616,7 @@ function renderUnavailablePm25Comparison() {
   els.pm25Summary.textContent = "PM2.5 comparison unavailable";
   els.pm25CompareDiagram.innerHTML = `
     <div class="compare-row">
-      <div class="compare-label">AQICN station AQI</div>
+      <div class="compare-label">AQICN station PM2.5</div>
       <div class="compare-bar-track">
         <div class="compare-bar-fill aqicn" style="width:4%"></div>
       </div>
@@ -978,6 +977,10 @@ function renderDetail(detail, rainAdjustment) {
   els.rainNowIcon.setAttribute("aria-label", rainAdjustment?.metricLabel || "Weather description unavailable");
   els.groundValue.textContent = rainAdjustment?.groundLabel || "--";
   renderScore(scoreText, scoreCaption);
+  const dominantPollutant = formatPollutant(detail.dominentpol || "");
+  els.dominantPollutant.textContent = detail.dominentpol
+    ? `AQICN dominant pollutant: ${dominantPollutant}`
+    : "Dominant pollutant unavailable";
   els.aqiUpdated.textContent = formatUpdatedLabel(detail.time?.iso, "AQICN updated");
 }
 
@@ -1183,8 +1186,9 @@ async function renderSelectedStationPanel(neaForecast, neaDayForecast, rainfallD
   renderDetail(detail, rainAdjustment);
   const pm25Region = getRegionForCoordinates(coordinates);
   const neaPm25 = Number(pm25Data?.items?.[0]?.readings?.pm25_one_hourly?.[pm25Region]);
-  if (Number.isFinite(Number(detail.aqi)) || Number.isFinite(neaPm25)) {
-    renderPm25Comparison(Number(detail.aqi), neaPm25, `${pm25Region.charAt(0).toUpperCase()}${pm25Region.slice(1)}`);
+  const aqicnPm25 = Number(detail.iaqi?.pm25?.v);
+  if (Number.isFinite(aqicnPm25) || Number.isFinite(neaPm25)) {
+    renderPm25Comparison(aqicnPm25, neaPm25, `${pm25Region.charAt(0).toUpperCase()}${pm25Region.slice(1)}`);
   } else {
     renderUnavailablePm25Comparison();
   }

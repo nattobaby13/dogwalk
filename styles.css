@@ -551,6 +551,13 @@ h3 {
   line-height: 1.35;
 }
 
+.score-subtle {
+  margin-top: 8px;
+  color: var(--soft);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
 .solo-score-card {
   text-align: left;
 }
